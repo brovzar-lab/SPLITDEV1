@@ -52,6 +52,19 @@ describe('POST /api/chat', () => {
     expect(persisted.length).toBe(2); // user + ai
   });
 
+  it('streams a session opener and persists the AI message', async () => {
+    const db = openDb(':memory:');
+    const sp = createScreenplay(db, { title: 'The Cabin', author: 'Maya', source_format: 'fountain', source_text: '' });
+    const app = buildApp({ db });
+    const res = await request(app).post(`/api/screenplays/${sp.id}/session/open`).send({});
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/);
+    expect(res.text).toContain('event: token');
+    expect(res.text).toContain('event: done');
+    const messages = db.prepare('SELECT * FROM chat_message WHERE screenplay_id = ? AND role = ?').all(sp.id, 'ai');
+    expect(messages.length).toBe(1);
+  });
+
   it('handles script-level chat (no noteId) with outline context', async () => {
     const db = openDb(':memory:');
     const sp = createScreenplay(db, { title: 'Test', author: null, source_format: 'fountain', source_text: '' });

@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { anthropicClient } from '../anthropic/client.js';
-import { loadAgentPrompt, loadCharacterPrompt } from '../anthropic/prompts.js';
+import { loadAgentPrompt, loadCharacterPrompt, loadPromptFile } from '../anthropic/prompts.js';
 import { insertChatMessage, listChatHistory } from '../models/chat.js';
 import { getScreenplay } from '../models/screenplay.js';
 import { listScenes } from '../models/scene.js';
 import { listLines } from '../models/line.js';
 import { listCharacterBible } from '../models/characterBible.js';
-import { getNote } from '../models/note.js';
+import { getNote, listNotes } from '../models/note.js';
 import { env } from '../env.js';
 
 const r = Router();
@@ -135,6 +135,66 @@ r.post('/chat', async (req, res) => {
     target_kind: target.kind, target_id: target.id, text: fullText, voice_match: voiceMatch,
   });
 
+  res.write(`event: done\ndata: ${JSON.stringify({ messageId: aiRow.id })}\n\n`);
+  res.end();
+});
+
+r.post('/screenplays/:id/session/open', async (req, res) => {
+  const db = req.app.locals.db;
+  const sp = getScreenplay(db, req.params.id);
+  if (!sp) return res.status(404).json({ error: 'not found', code: 'not_found' });
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  // Build top-3 unread triage notes by priority
+  const notes = listNotes(db, sp.id);
+  const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const sorted = notes
+    .filter(n => n.status === 'unread')
+    .sort((a, b) => order[a.priority] - order[b.priority])
+    .slice(0, 3);
+
+  const triageNotesText = sorted.length === 0
+    ? "(No triage notes yet — this is the first time you're seeing this script.)"
+    : sorted.map(n => `- [${n.priority}] ${n.title}: ${n.body}`).join('\n');
+
+  const scenes = listScenes(db, sp.id);
+  const system = loadPromptFile('session-opener', {
+    title: sp.title,
+    author: sp.author ?? 'unknown',
+    sceneCount: String(scenes.length),
+    triageNotes: triageNotesText,
+  });
+
+  let fullText = '';
+  try {
+    const stream = anthropicClient().messages.stream({
+      model: env.MODEL,
+      max_tokens: 2048,
+      system,
+      messages: [{ role: 'user', content: 'Open the session.' }],
+    });
+    for await (const event of stream as AsyncIterable<any>) {
+      if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        const t: string = event.delta.text;
+        fullText += t;
+        res.write(`event: token\ndata: ${JSON.stringify(t)}\n\n`);
+      }
+      if (event?.type === 'message_stop') break;
+    }
+  } catch (err) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: (err as Error).message })}\n\n`);
+    res.end();
+    return;
+  }
+
+  const aiRow = insertChatMessage(db, {
+    screenplay_id: sp.id, note_id: null, role: 'ai',
+    target_kind: 'agent', target_id: 'dialogue', text: fullText, voice_match: null,
+  });
   res.write(`event: done\ndata: ${JSON.stringify({ messageId: aiRow.id })}\n\n`);
   res.end();
 });
