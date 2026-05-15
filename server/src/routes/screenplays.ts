@@ -3,6 +3,9 @@ import multer from 'multer';
 import { listScreenplays, createScreenplay, getScreenplay } from '../models/screenplay.js';
 import { insertScene, listScenes } from '../models/scene.js';
 import { insertLine, listLines } from '../models/line.js';
+import { listNotes } from '../models/note.js';
+import { listCharacterBible } from '../models/characterBible.js';
+import { listBeats } from '../models/beat.js';
 import { parseFountain } from '../parsers/fountain.js';
 import { parseFdx } from '../parsers/fdx.js';
 import type { ParsedScreenplay } from '../parsers/types.js';
@@ -71,9 +74,9 @@ r.get('/:id', (req, res) => {
   res.json({
     screenplay: sp,
     scenes,
-    notes: [],
-    characterBible: [],
-    beats: [],
+    notes: listNotes(db, sp.id),
+    characterBible: listCharacterBible(db, sp.id),
+    beats: listBeats(db, sp.id),
   });
 });
 
