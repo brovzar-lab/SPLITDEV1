@@ -56,6 +56,18 @@ Two processes start via `concurrently`:
 
 Open `http://localhost:5173/`. Upload a `.fountain` or `.fdx` from the library page, click it, edit in place. Edits autosave to `server/data/screenplays.db`.
 
+## First session (MVP-2)
+
+1. **Upload** a Fountain or FDX file. The card shows "Reading your screenplay…" for a few seconds.
+2. **Auto-triage** runs — the AI reads the full script and writes 5–7 priority notes to your Notes panel.
+3. **Editor opens** with the Notes panel already populated.
+4. The **AI greets you** in the chat: "Just finished reading [Title]. Two things jumped out — [X] and [Y]. Where do you want to start?"
+5. **Chat just works** — no need to select a note first. Talk to the script as a whole, or click a note in the panel to scope the conversation.
+6. **Producer notes?** Click "📋 Ingest notes" in the Notes panel. Paste an email or upload a `.txt` / `.md` / `.docx` / `.pdf`. The AI extracts each distinct concern into its own structured note row.
+7. **Want feedback on a specific scene?** Click "★ Ask AI" next to any scene heading. A templated question fires automatically.
+8. **Add your own notes** via "+ New note" in the panel.
+9. **Export** the edited script back to Fountain or FDX via the Export menu in the top bar.
+
 ## Other scripts
 
 ```bash
@@ -75,24 +87,30 @@ npm test             # run server vitest suite
 - `POST   /api/screenplays/:id/notes`, `PATCH /api/notes/:id`, `DELETE /api/notes/:id`
 - `GET    /api/screenplays/:id/export?format=fountain|fdx`
 - `POST   /api/chat`                                 — SSE stream of token / meta / done / error events
+- `POST   /api/screenplays/:id/session/open`         — SSE stream of the unprompted AI greeting on editor open
+- `GET    /api/screenplays/:id/chat?noteId=`         — chat history (default: script-level, noteId=null)
+- `GET    /api/screenplays/:id/triage`               — auto-triage status (`pending` | `running` | `done` | `failed`)
+- `POST   /api/screenplays/:id/notes:ingest`         — paste text or upload `.txt/.md/.docx/.pdf` → AI-extracted note rows
 - `GET    /api/health`
 
 Full design + decisions: [`docs/superpowers/specs/2026-05-14-splitdev1-mvp1-design.md`](docs/superpowers/specs/2026-05-14-splitdev1-mvp1-design.md).
 Implementation plan: [`docs/superpowers/plans/2026-05-14-splitdev1-mvp1.md`](docs/superpowers/plans/2026-05-14-splitdev1-mvp1.md).
 
-## Known limitations (MVP-1)
+## Known limitations (MVP-2)
 
 - **Lossy round-trip**: features the structured model doesn't capture (FDX transitions, dual dialogue, in-script script-notes, Fountain boneyards) survive only in `screenplay.source_text` and are dropped on re-export. The original upload is preserved in the DB if you ever need to recover it.
 - **No auth**: server binds to `127.0.0.1` only, single-user local.
-- **No undo/redo across sessions**: `revision_entry` powers the Editor's Log footer when present, but reverting isn't wired yet.
-- **Editor's Log (revision_entry) is wired in the DB but not yet populated by any route.** The History footer currently renders an empty state. Fully wiring it requires the chat "Apply" flow and per-note revision recording, both deferred to MVP-2.
-- **AI cost on the user**: every chat message hits Anthropic. No caching, no rate limit.
-- **Notes / Bible / Beats start empty** on upload — you add them through the UI.
+- **PDF ingestion fidelity** depends on the PDF. Text-based PDFs work well. Scanned or image-based PDFs return garbage — paste the text into the modal instead.
+- **`.pages` files are not supported.** Apple Pages is a closed format; export to `.docx` first.
+- **AI cost on the user**: every upload triggers auto-triage (1 Opus call), every editor open triggers a session greeting (1 Opus call), every chat message hits Anthropic. No caching, no rate limit.
+- **Editor's Log (`revision_entry`)** is wired in the DB but the "Apply ▸" chat suggestion flow that would write to it is still deferred to MVP-3.
+- **Character Bible / Beats start empty** on upload — those are still added through the UI manually (Notes are now auto-populated by triage).
 
 ## Tech stack
 
 - **Client**: React 18.3, React Router 7, TypeScript 5.6, Vite 5, inline styles via `RD` token object, no CSS framework
 - **Server**: Node 20+, Express 4, `better-sqlite3` 11, `tsx` (dev), TypeScript 5.6
 - **Parsers**: `fountain-js` (parse) + in-house Fountain serializer, in-house FDX parser + serializer using `fast-xml-parser`
+- **Note ingestion**: `mammoth` (.docx → text), `pdf-parse` (.pdf → text), Anthropic for structured extraction (zod-validated)
 - **AI**: `@anthropic-ai/sdk`, default model `claude-opus-4-7`, voice-match scoring via `claude-haiku-4-5-20251001`
-- **Testing**: Vitest + supertest (server only; React UI is manual QA for MVP-1)
+- **Testing**: Vitest + supertest, 40 tests across server (React UI is manual QA)
