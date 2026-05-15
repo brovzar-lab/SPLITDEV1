@@ -27,6 +27,8 @@ interface Props {
   openBible: () => void;
   initialHistory?: ApiChatMessage[];
   greeting?: { text: string; done: boolean; error?: string } | null;
+  pendingMessage?: string | null;
+  onPendingConsumed?: () => void;
 }
 
 export function Chat({
@@ -43,6 +45,8 @@ export function Chat({
   openBible,
   initialHistory,
   greeting,
+  pendingMessage,
+  onPendingConsumed,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
@@ -215,6 +219,26 @@ export function Chat({
       message: text,
     }).catch(err => console.error('[chat stream]', err));
   }, [inputVal, screenplayId, noteId, target, streamSend, respondent, respondentColor, character]);
+
+  // One-shot trigger: when Editor passes a pendingMessage (e.g. from ★ Ask AI),
+  // auto-send it through the same pipeline as a manual send, then clear it.
+  useEffect(() => {
+    if (!pendingMessage || !screenplayId || streaming) return;
+    streamRespondentRef.current = {
+      name: respondent,
+      color: respondentColor,
+      inCharacter: !!character,
+    };
+    setMessages(prev => [...prev, { role: 'user', text: pendingMessage }]);
+    streamSend({
+      screenplayId,
+      noteId: noteId ?? null,
+      target,
+      message: pendingMessage,
+    }).catch(err => console.error('[chat stream pending]', err));
+    onPendingConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMessage, screenplayId]);
 
   // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =

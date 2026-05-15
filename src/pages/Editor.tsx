@@ -40,6 +40,7 @@ export default function Editor() {
   const [viewMode, setViewMode] = useState<'script' | 'cards'>('script');
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
+  const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
 
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
@@ -186,6 +187,14 @@ export default function Editor() {
     if (activeNote === id) setActiveNote('');
   };
 
+  const handleAskScene = (sceneId: string) => {
+    setActiveScene(sceneId);
+    const scene = data?.scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+    const message = `What's working and what isn't in this scene: "${scene.heading}"? Focus on the strongest beat and the weakest one.`;
+    setPendingChatMessage(message);
+  };
+
   // Page math — approximate using line counts
   const linesPerPage = 55;
   const totalLines = scenes.reduce((sum, s) => sum + s.lines.length + 3, 0);
@@ -260,6 +269,7 @@ export default function Editor() {
             onLineAction={handleLineAction}
             onLineEdit={onLineEdit}
             onSceneEdit={onSceneEdit}
+            onAskScene={handleAskScene}
             title={screenplay.title}
             author={screenplay.author ?? undefined}
           />
@@ -321,6 +331,8 @@ export default function Editor() {
               openBible={() => setBibleOpen(true)}
               initialHistory={history ?? undefined}
               greeting={greeting}
+              pendingMessage={pendingChatMessage}
+              onPendingConsumed={() => setPendingChatMessage(null)}
             />
           </div>
         </div>
