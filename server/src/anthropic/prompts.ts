@@ -18,3 +18,9 @@ export function loadCharacterPrompt(vars: Record<string, string | undefined>): s
   const path = join(__dirname, 'prompts', 'characters', 'voice.md');
   return interpolate(readFileSync(path, 'utf8'), vars);
 }
+
+export function loadPromptFile(relativePath: string, vars: Record<string, string | undefined>): string {
+  const path = join(__dirname, 'prompts', `${relativePath}.md`);
+  if (!existsSync(path)) throw new Error(`No prompt: ${relativePath}`);
+  return interpolate(readFileSync(path, 'utf8'), vars);
+}
