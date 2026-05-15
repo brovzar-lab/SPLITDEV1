@@ -56,7 +56,7 @@ describe('POST /api/screenplays', () => {
   it('rejects unknown extensions', async () => {
     const db = openDb(':memory:');
     const app = buildApp({ db });
-    const res = await request(app).post('/api/screenplays').attach('file', Buffer.from('hi'), 'x.txt');
+    const res = await request(app).post('/api/screenplays').attach('file', Buffer.from('hi'), 'x.pdf');
     expect(res.status).toBe(400);
   });
 });

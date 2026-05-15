@@ -20,7 +20,7 @@ r.post('/', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'file is required', code: 'no_file' });
   const name = req.file.originalname.toLowerCase();
   let format: SourceFormat;
-  if (name.endsWith('.fountain')) format = 'fountain';
+  if (name.endsWith('.fountain') || name.endsWith('.txt')) format = 'fountain';
   else if (name.endsWith('.fdx')) format = 'fdx';
   else return res.status(400).json({ error: 'unsupported extension', code: 'bad_extension' });
 
