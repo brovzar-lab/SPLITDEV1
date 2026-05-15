@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RD } from '../tokens';
 import { AGENTS } from '../data/agents';
 import { NOTE_ORIGINS } from '../data/notes';
-import { AI_RESPONSES, CHARACTER_LINES } from '../data/responses';
+import { useChatStream } from '../hooks/useChatStream';
 import type { Note } from '../api/types';
 import type {
   ChatMessage,
@@ -14,6 +14,8 @@ import type {
 import type { CharacterBibleEntry } from '../api/types';
 
 interface Props {
+  screenplayId: string;
+  noteId?: string | null;
   activeNote: string;
   activeAgent: string;
   setActiveAgent: (id: string) => void;
@@ -26,6 +28,8 @@ interface Props {
 }
 
 export function Chat({
+  screenplayId,
+  noteId,
   activeNote,
   activeAgent,
   setActiveAgent,
@@ -38,11 +42,12 @@ export function Chat({
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
-  const [typing, setTyping] = useState(false);
   const [pinned, setPinned] = useState<PinnedMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevNoteRef = useRef<string | null>(null);
+
+  const { reply, streaming, send: streamSend } = useChatStream();
 
   // Combine api notes with legacy pattern notes for lookup
   const allNotes: Array<Note | PatternNote> = [...notes, ...patternNotes];
@@ -72,7 +77,26 @@ export function Chat({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, typing]);
+  }, [messages, streaming, reply.text]);
+
+  // Finalize the streaming reply into the messages list when done
+  useEffect(() => {
+    if (reply.done && reply.text) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          text: reply.text,
+          respondent,
+          respondentColor,
+          inCharacter: !!character,
+          showApply: !character,
+          voiceMatch: reply.voiceMatch,
+        },
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reply.done]);
 
   const respondent = character ? character.name : `${agent.name} Agent`;
   const respondentColor = character ? character.color : agent.color;
@@ -111,37 +135,18 @@ export function Chat({
   const unpinMessage = (id: string) =>
     setPinned(prev => prev.filter(p => p.id !== id));
 
-  const getReply = (): string => {
-    if (character) {
-      const pool = CHARACTER_LINES[character.id] || ['...'];
-      return pool[Math.floor(Math.random() * pool.length)];
-    }
-    const pool = AI_RESPONSES[target.id] || AI_RESPONSES['dialogue'];
-    return pool[Math.floor(Math.random() * pool.length)];
-  };
-
-  const send = () => {
+  const send = useCallback(() => {
     const text = inputVal.trim();
-    if (!text) return;
+    if (!text || !screenplayId) return;
     setMessages(prev => [...prev, { role: 'user', text }]);
     setInputVal('');
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'ai',
-          text: getReply(),
-          respondent,
-          respondentColor,
-          inCharacter: !!character,
-          showApply: !character && Math.random() > 0.4,
-          voiceMatch: !character ? 0.7 + Math.random() * 0.25 : null,
-        },
-      ]);
-    }, 800 + Math.random() * 1000);
-  };
+    streamSend({
+      screenplayId,
+      noteId: noteId ?? null,
+      target,
+      message: text,
+    }).catch(err => console.error('[chat stream]', err));
+  }, [inputVal, screenplayId, noteId, target, streamSend]);
 
   // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =
@@ -219,7 +224,7 @@ export function Chat({
               whiteSpace: 'nowrap',
             }}
           >
-            {typing
+            {streaming
               ? 'composing reply…'
               : character
               ? `in character · ${(character.role || '').toLowerCase()}`
@@ -660,16 +665,74 @@ export function Chat({
           </div>
         ))}
 
-        {typing && (
-          <div
-            style={{
-              fontSize: 11,
-              color: RD.inkFade,
-              fontStyle: 'italic',
-              fontFamily: RD.display,
-            }}
-          >
-            {respondent} is writing…
+        {streaming && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontFamily: RD.display,
+                fontSize: 11,
+                fontStyle: 'italic',
+                color: respondentColor,
+                marginBottom: 3,
+                letterSpacing: 0.5,
+              }}
+            >
+              {respondent}
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 9,
+                  color: RD.inkFade,
+                  fontStyle: 'normal',
+                  fontFamily: RD.sans,
+                }}
+              >
+                streaming…
+              </span>
+            </div>
+            <div
+              style={{
+                padding: character ? '14px 18px' : '10px 14px',
+                background: character ? '#fff' : RD.card,
+                border: `1px solid ${RD.line}`,
+                borderLeft: `3px solid ${respondentColor}`,
+                borderRadius: 1,
+                lineHeight: 1.55,
+                fontSize: 13,
+                color: RD.ink,
+                fontFamily: character ? RD.script : RD.sans,
+              }}
+            >
+              {character && (
+                <div
+                  style={{
+                    fontFamily: RD.script,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    letterSpacing: 1.5,
+                    marginBottom: 6,
+                    color: RD.ink,
+                  }}
+                >
+                  {respondent.toUpperCase()}
+                </div>
+              )}
+              <div
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  textAlign: character ? 'center' : 'left',
+                  padding: character ? '0 30px' : 0,
+                }}
+              >
+                {reply.text || (
+                  <span style={{ color: RD.inkFade, fontStyle: 'italic' }}>
+                    {respondent} is writing…
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -809,13 +872,15 @@ export function Chat({
               }
             }}
             placeholder={
-              note
+              streaming
+                ? 'Waiting for reply…'
+                : note
                 ? character
                   ? `Speak to ${character.name}…`
                   : `Compose to ${agent.name}…`
                 : 'Select a note first…'
             }
-            disabled={!note}
+            disabled={!note || streaming}
             rows={1}
             style={{
               flex: 1,
@@ -835,7 +900,7 @@ export function Chat({
           />
           <button
             onClick={send}
-            disabled={!inputVal.trim() || !note}
+            disabled={!inputVal.trim() || !note || streaming}
             style={{
               padding: '10px 18px',
               fontFamily: RD.display,
@@ -843,11 +908,11 @@ export function Chat({
               fontWeight: 700,
               letterSpacing: 1,
               textTransform: 'uppercase',
-              background: inputVal.trim() && note ? RD.copper : RD.lineDeep,
+              background: inputVal.trim() && note && !streaming ? RD.copper : RD.lineDeep,
               color: RD.paper,
               border: 'none',
               borderRadius: 1,
-              cursor: inputVal.trim() && note ? 'pointer' : 'default',
+              cursor: inputVal.trim() && note && !streaming ? 'pointer' : 'default',
             }}
           >
             Send ▸

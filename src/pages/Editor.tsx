@@ -290,6 +290,8 @@ export default function Editor() {
             style={{ flex: 1 - notesSplit, minHeight: 100, overflow: 'hidden' }}
           >
             <Chat
+              screenplayId={screenplay.id}
+              noteId={activeNote || null}
               activeNote={activeNote}
               activeAgent={activeAgent}
               setActiveAgent={setActiveAgent}
