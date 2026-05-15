@@ -1,4 +1,4 @@
-import type { FullScreenplay, Screenplay, Note, Line, Scene } from './types';
+import type { FullScreenplay, Screenplay, Note, Line, Scene, ChatMessage } from './types';
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
@@ -45,4 +45,9 @@ export const api = {
 
   exportUrl: (id: string, format: 'fountain' | 'fdx') =>
     `/api/screenplays/${id}/export?format=${format}`,
+
+  getChatHistory: (screenplayId: string, noteId?: string | null) => {
+    const q = noteId ? `?noteId=${encodeURIComponent(noteId)}` : '';
+    return request<{ messages: ChatMessage[] }>(`/api/screenplays/${screenplayId}/chat${q}`);
+  },
 };

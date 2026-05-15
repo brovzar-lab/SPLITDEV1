@@ -20,6 +20,22 @@ vi.mock('../../src/anthropic/client.js', () => ({
   }),
 }));
 
+describe('GET /api/screenplays/:id/chat', () => {
+  it('returns chat history for a screenplay (null noteId default)', async () => {
+    const db = openDb(':memory:');
+    const sp = createScreenplay(db, { title: 'T', author: null, source_format: 'fountain', source_text: '' });
+    db.prepare(`INSERT INTO chat_message (id, screenplay_id, note_id, role, target_kind, target_id, text, voice_match, at)
+      VALUES ('m1', ?, null, 'user', 'agent', 'dialogue', 'hi', null, 100),
+             ('m2', ?, null, 'ai', 'agent', 'dialogue', 'hello', null, 200)`).run(sp.id, sp.id);
+    const app = buildApp({ db });
+    const res = await request(app).get(`/api/screenplays/${sp.id}/chat`);
+    expect(res.status).toBe(200);
+    expect(res.body.messages).toHaveLength(2);
+    expect(res.body.messages[0].text).toBe('hi');
+    expect(res.body.messages[1].text).toBe('hello');
+  });
+});
+
 describe('POST /api/chat', () => {
   it('streams an SSE response and persists messages', async () => {
     const db = openDb(':memory:');

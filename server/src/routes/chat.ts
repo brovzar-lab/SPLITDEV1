@@ -31,6 +31,13 @@ async function scoreVoiceMatch(rules: string, text: string): Promise<number | nu
   }
 }
 
+r.get('/screenplays/:id/chat', (req, res) => {
+  const db = req.app.locals.db;
+  const noteId = req.query.noteId as string | undefined;
+  const messages = listChatHistory(db, req.params.id, noteId ?? null, 100);
+  res.json({ messages });
+});
+
 r.post('/chat', async (req, res) => {
   const { screenplayId, noteId = null, target, message } = req.body as {
     screenplayId: string; noteId?: string | null;
