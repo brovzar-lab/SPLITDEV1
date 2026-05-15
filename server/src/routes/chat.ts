@@ -49,11 +49,23 @@ r.post('/chat', async (req, res) => {
 
   const note = noteId ? getNote(db, noteId) : null;
   const allScenes = listScenes(db, sp.id);
-  const targetSceneId = note?.scenes[0] ?? allScenes[0]?.id;
-  const sceneLines = targetSceneId ? listLines(db, targetSceneId) : [];
-  const sceneContext = sceneLines.map(l =>
-    l.type === 'action' ? l.text : `${l.character}${l.parenthetical ? ` (${l.parenthetical})` : ''}: ${l.text}`
-  ).join('\n');
+
+  let context: string;
+  if (note) {
+    // Note-scoped: full text of the linked scene
+    const targetSceneId = note.scenes[0] ?? allScenes[0]?.id;
+    const sceneLines = targetSceneId ? listLines(db, targetSceneId) : [];
+    context = sceneLines.map(l =>
+      l.type === 'action' ? l.text : `${l.character}${l.parenthetical ? ` (${l.parenthetical})` : ''}: ${l.text}`
+    ).join('\n');
+  } else {
+    // Script-level: outline of all scenes (heading + first 2 action lines each)
+    context = allScenes.map(s => {
+      const lines = listLines(db, s.id);
+      const headerActions = lines.filter(l => l.type === 'action').slice(0, 2);
+      return `${s.heading}\n${headerActions.map(l => l.text).join('\n')}`;
+    }).join('\n\n');
+  }
 
   let system: string;
   if (target.kind === 'character') {
@@ -63,10 +75,10 @@ r.post('/chat', async (req, res) => {
       characterName: c.name, characterRole: c.role ?? '',
       characterWant: c.want ?? '', characterNeed: c.need ?? '',
       voiceRules: c.voice.map(v => `- ${v}`).join('\n'),
-      sceneContext,
+      sceneContext: context,
     });
   } else {
-    system = loadAgentPrompt(target.id, { sceneContext, noteBody: note?.body ?? '' });
+    system = loadAgentPrompt(target.id, { sceneContext: context, noteBody: note?.body ?? '' });
   }
 
   const history = listChatHistory(db, sp.id, noteId, 10).map(m => ({

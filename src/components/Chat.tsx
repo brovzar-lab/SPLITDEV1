@@ -302,7 +302,7 @@ export function Chat({
           backgroundImage: RD.paperGrain,
         }}
       >
-        {!note && (
+        {!screenplayId && (
           <div
             style={{
               textAlign: 'center',
@@ -896,9 +896,9 @@ export function Chat({
                 ? character
                   ? `Speak to ${character.name}…`
                   : `Compose to ${agent.name}…`
-                : 'Select a note first…'
+                : 'Talk about your script…'
             }
-            disabled={!note || streaming}
+            disabled={streaming}
             rows={1}
             style={{
               flex: 1,
@@ -918,7 +918,7 @@ export function Chat({
           />
           <button
             onClick={send}
-            disabled={!inputVal.trim() || !note || streaming}
+            disabled={!inputVal.trim() || streaming || !screenplayId}
             style={{
               padding: '10px 18px',
               fontFamily: RD.display,
@@ -926,11 +926,11 @@ export function Chat({
               fontWeight: 700,
               letterSpacing: 1,
               textTransform: 'uppercase',
-              background: inputVal.trim() && note && !streaming ? RD.copper : RD.lineDeep,
+              background: inputVal.trim() && !streaming && screenplayId ? RD.copper : RD.lineDeep,
               color: RD.paper,
               border: 'none',
               borderRadius: 1,
-              cursor: inputVal.trim() && note && !streaming ? 'pointer' : 'default',
+              cursor: inputVal.trim() && !streaming && screenplayId ? 'pointer' : 'default',
             }}
           >
             Send ▸

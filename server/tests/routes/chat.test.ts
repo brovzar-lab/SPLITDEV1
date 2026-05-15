@@ -35,4 +35,22 @@ describe('POST /api/chat', () => {
     const persisted = db.prepare('SELECT * FROM chat_message WHERE screenplay_id = ?').all(sp.id);
     expect(persisted.length).toBe(2); // user + ai
   });
+
+  it('handles script-level chat (no noteId) with outline context', async () => {
+    const db = openDb(':memory:');
+    const sp = createScreenplay(db, { title: 'Test', author: null, source_format: 'fountain', source_text: '' });
+    db.prepare(`INSERT INTO scene (id, screenplay_id, position, heading) VALUES ('s1', ?, 0, 'INT. CABIN - DAY')`).run(sp.id);
+    db.prepare(`INSERT INTO line (id, scene_id, position, type, character, parenthetical, text)
+      VALUES ('l1', 's1', 0, 'action', null, null, 'Sarah enters.')`).run();
+    const app = buildApp({ db });
+    const res = await request(app).post('/api/chat').send({
+      screenplayId: sp.id,
+      target: { kind: 'agent', id: 'dialogue' },
+      message: 'what should I work on?',
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/event-stream/);
+    expect(res.text).toContain('event: token');
+    expect(res.text).toContain('event: done');
+  });
 });
