@@ -82,3 +82,28 @@ export function parseFountain(source: string): ParsedScreenplay {
 function stripBracketSceneNumber(s: string): string {
   return s.replace(/\s*#\S+#\s*$/, '').trim();
 }
+
+export function serializeFountain(ps: ParsedScreenplay): string {
+  const lines: string[] = [];
+  if (ps.title) lines.push(`Title: ${ps.title}`);
+  if (ps.author) lines.push(`Author: ${ps.author}`);
+  if (lines.length) lines.push('');
+
+  for (const scene of ps.scenes) {
+    lines.push('');
+    lines.push(scene.heading);
+    lines.push('');
+    for (const l of scene.lines) {
+      if (l.type === 'action') {
+        lines.push(l.text);
+        lines.push('');
+      } else {
+        lines.push(l.character ?? 'UNKNOWN');
+        if (l.parenthetical) lines.push(`(${l.parenthetical})`);
+        lines.push(l.text);
+        lines.push('');
+      }
+    }
+  }
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+}

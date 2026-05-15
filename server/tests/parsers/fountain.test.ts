@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { parseFountain } from '../../src/parsers/fountain.js';
+import { parseFountain, serializeFountain } from '../../src/parsers/fountain.js';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'parsers', '__fixtures__');
 
@@ -30,5 +30,25 @@ describe('parseFountain', () => {
     const dialogue = ps.scenes.flatMap(s => s.lines).filter(l => l.type === 'dialogue');
     expect(dialogue.some(d => d.character === 'SARAH')).toBe(true);
     expect(dialogue.some(d => d.parenthetical?.includes('into phone'))).toBe(true);
+  });
+});
+
+describe('serializeFountain', () => {
+  it('round-trips a minimal screenplay', () => {
+    const src = readFileSync(join(fixtureDir, 'minimal.fountain'), 'utf8');
+    const ps = parseFountain(src);
+    const back = serializeFountain(ps);
+    const reparsed = parseFountain(back);
+    expect(reparsed.title).toBe(ps.title);
+    expect(reparsed.scenes).toEqual(ps.scenes);
+  });
+
+  it('preserves parentheticals and dialogue across round-trip', () => {
+    const src = readFileSync(join(fixtureDir, 'the-cabin.fountain'), 'utf8');
+    const ps = parseFountain(src);
+    const back = serializeFountain(ps);
+    const reparsed = parseFountain(back);
+    expect(reparsed.scenes.length).toBe(ps.scenes.length);
+    expect(reparsed.scenes[0].lines).toEqual(ps.scenes[0].lines);
   });
 });
