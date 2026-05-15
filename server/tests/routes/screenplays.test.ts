@@ -60,3 +60,27 @@ describe('POST /api/screenplays', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('GET /api/screenplays/:id', () => {
+  it('returns 404 when missing', async () => {
+    const app = buildApp({ db: openDb(':memory:') });
+    const res = await request(app).get('/api/screenplays/missing');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns the full payload after upload', async () => {
+    const db = openDb(':memory:');
+    const app = buildApp({ db });
+    const fountain = readFileSync(join(fixtureDir, 'the-cabin.fountain'));
+    const up = await request(app).post('/api/screenplays').attach('file', fountain, 'the-cabin.fountain');
+    const id = up.body.screenplay.id;
+    const res = await request(app).get(`/api/screenplays/${id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.screenplay.id).toBe(id);
+    expect(res.body.scenes.length).toBeGreaterThanOrEqual(4);
+    expect(res.body.scenes[0].lines.length).toBeGreaterThan(0);
+    expect(res.body.notes).toEqual([]);
+    expect(res.body.characterBible).toEqual([]);
+    expect(res.body.beats).toEqual([]);
+  });
+});

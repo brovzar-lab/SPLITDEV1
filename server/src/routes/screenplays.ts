@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { listScreenplays, createScreenplay } from '../models/screenplay.js';
-import { insertScene } from '../models/scene.js';
-import { insertLine } from '../models/line.js';
+import { listScreenplays, createScreenplay, getScreenplay } from '../models/screenplay.js';
+import { insertScene, listScenes } from '../models/scene.js';
+import { insertLine, listLines } from '../models/line.js';
 import { parseFountain } from '../parsers/fountain.js';
 import { parseFdx } from '../parsers/fdx.js';
 import type { ParsedScreenplay } from '../parsers/types.js';
@@ -60,6 +60,20 @@ r.post('/', upload.single('file'), (req, res) => {
       source_format: screenplay.source_format, created_at: screenplay.created_at,
       updated_at: screenplay.updated_at,
     },
+  });
+});
+
+r.get('/:id', (req, res) => {
+  const db = req.app.locals.db;
+  const sp = getScreenplay(db, req.params.id);
+  if (!sp) return res.status(404).json({ error: 'not found', code: 'not_found' });
+  const scenes = listScenes(db, sp.id).map(s => ({ ...s, lines: listLines(db, s.id) }));
+  res.json({
+    screenplay: sp,
+    scenes,
+    notes: [],
+    characterBible: [],
+    beats: [],
   });
 });
 
