@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
-import { CHARACTER_BIBLE } from '../data/characters';
+import type { CharacterBibleEntry } from '../api/types';
 
 interface TopBarProps {
   revisionColor: string;
@@ -12,6 +13,10 @@ interface TopBarProps {
   setCharacterFilter: (c: string | null) => void;
   pageCount: number;
   totalPages: number;
+  title?: string;
+  author?: string | null;
+  sceneCount?: number;
+  characters: CharacterBibleEntry[];
 }
 
 export function TopBar({
@@ -21,6 +26,10 @@ export function TopBar({
   setViewMode,
   pageCount,
   totalPages,
+  title,
+  author,
+  sceneCount,
+  characters,
 }: TopBarProps) {
   const [showRev, setShowRev] = useState(false);
   const currentRev =
@@ -49,7 +58,7 @@ export function TopBar({
         }}
       />
 
-      {/* Logo block */}
+      {/* Logo block with back link */}
       <div
         style={{
           padding: '12px 24px',
@@ -59,6 +68,31 @@ export function TopBar({
           borderRight: `1px solid rgba(244,237,224,0.15)`,
         }}
       >
+        {/* Back to Library */}
+        <Link
+          to="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '4px 8px',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+            color: 'rgba(244,237,224,0.5)',
+            textDecoration: 'none',
+            borderRadius: 2,
+            border: '1px solid rgba(244,237,224,0.15)',
+            transition: 'color 0.15s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = RD.copperSoft)}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(244,237,224,0.5)')}
+        >
+          ← Lib
+        </Link>
+
         <div>
           <div
             style={{
@@ -114,7 +148,7 @@ export function TopBar({
               whiteSpace: 'nowrap',
             }}
           >
-            The Cabin
+            {title || 'Untitled'}
           </div>
           <div
             style={{
@@ -128,12 +162,16 @@ export function TopBar({
               whiteSpace: 'nowrap',
             }}
           >
-            <em style={{ fontFamily: RD.display, fontStyle: 'italic' }}>
-              a screenplay by
-            </em>{' '}
-            Maya Reeves
-            <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
-            42 scenes
+            {author && (
+              <>
+                <em style={{ fontFamily: RD.display, fontStyle: 'italic' }}>
+                  a screenplay by
+                </em>{' '}
+                {author}
+                <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
+              </>
+            )}
+            {sceneCount !== undefined && `${sceneCount} scene${sceneCount !== 1 ? 's' : ''}`}
           </div>
         </div>
 
@@ -274,7 +312,7 @@ export function TopBar({
             ))}
           </div>
 
-          <VoiceCast />
+          <VoiceCast characters={characters} />
         </div>
       </div>
 
@@ -291,7 +329,7 @@ export function TopBar({
   );
 }
 
-function VoiceCast() {
+function VoiceCast({ characters }: { characters: CharacterBibleEntry[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: 'relative' }}>
@@ -355,75 +393,89 @@ function VoiceCast() {
           >
             Assign voices for read-aloud
           </div>
-          {CHARACTER_BIBLE.map(c => (
+          {characters.length === 0 ? (
             <div
-              key={c.id}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '7px 0',
-                borderBottom: `1px solid ${RD.line}`,
+                fontSize: 11,
+                color: RD.inkFade,
+                fontStyle: 'italic',
+                textAlign: 'center',
+                padding: '12px 0',
               }}
             >
+              No characters yet
+            </div>
+          ) : (
+            characters.map(c => (
               <div
+                key={c.id}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: c.color,
-                  color: '#fff',
-                  fontFamily: RD.display,
-                  fontSize: 14,
-                  fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: 10,
+                  padding: '7px 0',
+                  borderBottom: `1px solid ${RD.line}`,
                 }}
               >
-                {c.name[0]}
-              </div>
-              <div style={{ flex: 1 }}>
                 <div
                   style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: RD.ink,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: c.color,
+                    color: '#fff',
                     fontFamily: RD.display,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {c.name}
+                  {c.name[0]}
                 </div>
-                <div
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: RD.ink,
+                      fontFamily: RD.display,
+                    }}
+                  >
+                    {c.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: RD.inkFade,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {c.role}
+                  </div>
+                </div>
+                <select
                   style={{
-                    fontSize: 9,
-                    color: RD.inkFade,
-                    letterSpacing: 0.5,
+                    fontSize: 10,
+                    fontFamily: RD.sans,
+                    padding: '3px 6px',
+                    border: `1px solid ${RD.line}`,
+                    borderRadius: 3,
+                    background: RD.paper,
+                    color: RD.ink,
+                    cursor: 'pointer',
                   }}
                 >
-                  {c.role}
-                </div>
+                  <option>Aria</option>
+                  <option>Brian</option>
+                  <option>Maya</option>
+                  <option>Cole</option>
+                  <option>Whisper</option>
+                </select>
               </div>
-              <select
-                style={{
-                  fontSize: 10,
-                  fontFamily: RD.sans,
-                  padding: '3px 6px',
-                  border: `1px solid ${RD.line}`,
-                  borderRadius: 3,
-                  background: RD.paper,
-                  color: RD.ink,
-                  cursor: 'pointer',
-                }}
-              >
-                <option>Aria</option>
-                <option>Brian</option>
-                <option>Maya</option>
-                <option>Cole</option>
-                <option>Whisper</option>
-              </select>
-            </div>
-          ))}
+            ))
+          )}
           <button
             style={{
               width: '100%',

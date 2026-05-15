@@ -1,7 +1,11 @@
 import { RD } from '../tokens';
-import { UNDO_HISTORY } from '../data/characters';
+import type { RevisionEntry } from '../api/types';
 
-export function History() {
+interface Props {
+  revisions: RevisionEntry[];
+}
+
+export function History({ revisions }: Props) {
   return (
     <div
       style={{
@@ -38,45 +42,58 @@ export function History() {
           overflowX: 'auto',
         }}
       >
-        {UNDO_HISTORY.map(h => {
-          const c =
-            h.action === 'Accepted'
-              ? RD.forest
-              : h.action === 'Rejected'
-              ? RD.ruby
-              : RD.gold;
-          return (
-            <div
-              key={h.id}
-              style={{
-                padding: '3px 9px',
-                borderRadius: 2,
-                fontSize: 10,
-                fontWeight: 500,
-                whiteSpace: 'nowrap',
-                background: c + '25',
-                color: c,
-                border: `1px solid ${c}50`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer',
-              }}
-            >
-              <span
+        {revisions.length === 0 ? (
+          <span
+            style={{
+              fontSize: 10,
+              color: RD.copperSoft,
+              fontStyle: 'italic',
+              fontFamily: RD.display,
+              opacity: 0.6,
+            }}
+          >
+            No history yet
+          </span>
+        ) : (
+          revisions.map(h => {
+            const c =
+              h.action === 'Accepted'
+                ? RD.forest
+                : h.action === 'Rejected'
+                ? RD.ruby
+                : RD.gold;
+            return (
+              <div
+                key={h.id}
                 style={{
-                  fontWeight: 700,
-                  fontFamily: RD.display,
-                  fontStyle: 'italic',
+                  padding: '3px 9px',
+                  borderRadius: 2,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  background: c + '25',
+                  color: c,
+                  border: `1px solid ${c}50`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  cursor: 'pointer',
                 }}
               >
-                {h.action}
-              </span>
-              <span style={{ opacity: 0.85 }}>{h.target}</span>
-              <span style={{ opacity: 0.5, fontSize: 9 }}>{h.time}</span>
-            </div>
-          );
-        })}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontFamily: RD.display,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {h.action}
+                </span>
+                <span style={{ opacity: 0.85 }}>{h.target}</span>
+              </div>
+            );
+          })
+        )}
       </div>
       <span
         style={{

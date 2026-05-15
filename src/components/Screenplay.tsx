@@ -2,27 +2,22 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
-import { VOICE_MATCHES } from '../data/notes';
-import { SCENE_EIGHTHS } from '../data/screenplay';
-import type {
-  LineChangeStatus,
-  ScreenplayLine,
-  ScreenplayScene,
-} from '../types';
+import type { Scene, Line } from '../api/types';
 
 type LineMenuState = { x: number; y: number; text: string } | null;
-type ChangeMap = Record<string, LineChangeStatus>;
+
+type ApiScene = Scene & { lines: Line[] };
 
 interface ScreenplayProps {
-  activeScene: number;
-  linkedScenes?: number[];
-  changes: ChangeMap;
-  setChanges: (updater: (prev: ChangeMap) => ChangeMap) => void;
-  screenplay: ScreenplayScene[];
+  activeScene: string;
+  linkedScenes?: string[];
+  screenplay: ApiScene[];
   viewMode: 'script' | 'cards';
   characterFilter: string | null;
   revisionColor: string;
   onLineAction?: (action: string, text: string) => void;
+  title?: string;
+  author?: string;
 }
 
 const btnStyle = (bg: string, fg: string): CSSProperties => ({
@@ -56,14 +51,14 @@ const btnOutline = (color: string, borderColor?: string): CSSProperties => ({
 export function Screenplay({
   activeScene,
   linkedScenes = [],
-  changes,
-  setChanges,
   screenplay,
   viewMode,
   revisionColor,
   onLineAction,
+  title,
+  author,
 }: ScreenplayProps) {
-  const sceneRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const sceneRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const revColor =
     REVISION_COLORS.find(r => r.id === revisionColor) || REVISION_COLORS[0];
 
@@ -88,15 +83,11 @@ export function Screenplay({
     return () => document.removeEventListener('click', close);
   }, [lineMenu]);
 
-  const handleChange = (cid: string, action: LineChangeStatus) =>
-    setChanges(prev => ({ ...prev, [cid]: action }));
-
   if (viewMode === 'cards') {
     return (
       <IndexCardsView
         screenplay={screenplay}
         activeScene={activeScene}
-        changes={changes}
         revColor={revColor}
       />
     );
@@ -105,22 +96,14 @@ export function Screenplay({
   const linesPerPage = 55;
   let runningLines = 0;
 
-  const openLineMenu = (e: React.MouseEvent, line: ScreenplayLine) => {
+  const openLineMenu = (e: React.MouseEvent, line: Line) => {
     e.preventDefault();
     e.stopPropagation();
-    const text =
-      line.type === 'action'
-        ? line.text
-        : line.line || (line.change ? line.change.inserted : '');
+    const text = line.type === 'action' ? line.text : (line.text || '');
     setLineMenu({ x: e.clientX, y: e.clientY, text });
   };
 
-  const renderLine = (line: ScreenplayLine, key: string) => {
-    const status: LineChangeStatus | undefined = line.change
-      ? changes[line.change.id] || line.change.status
-      : undefined;
-    const lineChanged = line.change && status !== 'rejected';
-
+  const renderLine = (line: Line, key: string) => {
     const wrap = (content: React.ReactNode) => (
       <div
         key={key}
@@ -145,148 +128,9 @@ export function Screenplay({
             lineHeight: 1.8,
             paddingTop: 3,
           }}
-        >
-          {lineChanged ? '*' : ''}
-        </div>
+        />
       </div>
     );
-
-    if (line.change) {
-      if (status === 'rejected') {
-        return wrap(
-          <div
-            style={{
-              fontFamily: RD.script,
-              fontSize: 13,
-              lineHeight: 1.85,
-              padding: '2px 0',
-              color: RD.ink,
-              outline: 'none',
-            }}
-            contentEditable
-            suppressContentEditableWarning
-          >
-            {line.change.deleted}
-          </div>,
-        );
-      }
-      if (status === 'accepted') {
-        return wrap(
-          <div
-            style={{
-              fontFamily: RD.script,
-              fontSize: 13,
-              lineHeight: 1.85,
-              padding: '2px 0 2px 8px',
-              color: RD.ink,
-              outline: 'none',
-              borderLeft: `2px solid ${RD.forest}`,
-            }}
-            contentEditable
-            suppressContentEditableWarning
-          >
-            {line.change.inserted}
-          </div>,
-        );
-      }
-      const confidence = VOICE_MATCHES[line.change.id] ?? 0.75;
-      const matchPercent = Math.round(confidence * 100);
-      const matchColor =
-        confidence > 0.8 ? RD.forest : confidence > 0.65 ? RD.gold : RD.ruby;
-      const change = line.change;
-
-      return (
-        <div key={key} style={{ margin: '12px 0', position: 'relative' }}>
-          <div
-            style={{
-              fontFamily: RD.script,
-              fontSize: 13,
-              lineHeight: 1.85,
-              color: RD.inkFade,
-              textDecoration: 'line-through',
-              textDecorationColor: RD.ruby,
-              textDecorationThickness: 1.5,
-            }}
-          >
-            {change.deleted}
-          </div>
-          <div
-            style={{
-              marginTop: 6,
-              padding: '10px 12px 12px',
-              background: RD.stickyYellow,
-              border: `1px solid ${RD.gold}60`,
-              borderRadius: '1px 1px 6px 1px',
-              boxShadow: RD.shadowSticky,
-              transform: 'rotate(-0.3deg)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 6,
-                paddingBottom: 5,
-                borderBottom: `1px dashed ${RD.gold}50`,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: RD.display,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontStyle: 'italic',
-                  color: RD.copper,
-                  letterSpacing: 0.5,
-                }}
-              >
-                {change.agent}'s suggestion
-              </span>
-              <span
-                style={{
-                  fontFamily: RD.sans,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: matchColor,
-                  padding: '1px 6px',
-                  borderRadius: 10,
-                  background: matchColor + '20',
-                }}
-              >
-                voice {matchPercent}%
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: RD.script,
-                fontSize: 13,
-                lineHeight: 1.7,
-                color: RD.ink,
-                marginBottom: 10,
-              }}
-            >
-              {change.inserted}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => handleChange(change.id, 'accepted')}
-                style={btnStyle(RD.forest, RD.paper)}
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => handleChange(change.id, 'rejected')}
-                style={btnOutline(RD.ruby)}
-              >
-                Reject
-              </button>
-              <button style={btnOutline(RD.inkSoft, RD.line)}>Edit</button>
-            </div>
-          </div>
-        </div>
-      );
-    }
 
     if (line.type === 'dialogue') {
       return wrap(
@@ -316,7 +160,7 @@ export function Screenplay({
             </div>
           )}
           <div style={{ outline: 'none' }} contentEditable suppressContentEditableWarning>
-            {line.line}
+            {line.text}
           </div>
         </div>,
       );
@@ -399,24 +243,26 @@ export function Screenplay({
                 marginBottom: 16,
               }}
             >
-              THE CABIN
+              {title ? title.toUpperCase() : 'UNTITLED'}
             </div>
-            <div
-              style={{
-                fontFamily: RD.display,
-                fontSize: 11,
-                fontStyle: 'italic',
-                color: RD.inkFade,
-                letterSpacing: 1,
-              }}
-            >
-              written by Maya Reeves
-            </div>
+            {author && (
+              <div
+                style={{
+                  fontFamily: RD.display,
+                  fontSize: 11,
+                  fontStyle: 'italic',
+                  color: RD.inkFade,
+                  letterSpacing: 1,
+                }}
+              >
+                written by {author}
+              </div>
+            )}
           </div>
 
           {screenplay.map((scene, si) => {
-            const isActive = scene.sceneId === activeScene;
-            const isLinked = linkedScenes.includes(scene.sceneId);
+            const isActive = scene.id === activeScene;
+            const isLinked = linkedScenes.includes(scene.id);
             const sceneStartPage = Math.floor(runningLines / linesPerPage) + 1;
             const sceneStartLineIdx = runningLines % linesPerPage;
             runningLines += scene.lines.length + 3;
@@ -433,9 +279,9 @@ export function Screenplay({
 
             return (
               <div
-                key={scene.sceneId}
+                key={scene.id}
                 ref={el => {
-                  sceneRefs.current[scene.sceneId] = el;
+                  sceneRefs.current[scene.id] = el;
                 }}
                 style={{
                   position: 'relative',
@@ -482,7 +328,7 @@ export function Screenplay({
                     gap: 8,
                   }}
                 >
-                  <span style={{ color: RD.inkFade }}>{scene.sceneId}.</span>
+                  <span style={{ color: RD.inkFade }}>{scene.position}.</span>
                   <span
                     style={{ flex: 1, outline: 'none' }}
                     contentEditable
@@ -506,17 +352,19 @@ export function Screenplay({
                       ← Linked
                     </span>
                   )}
-                  <span
-                    style={{
-                      fontFamily: RD.display,
-                      fontSize: 10,
-                      fontStyle: 'italic',
-                      color: RD.inkFade,
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {SCENE_EIGHTHS[scene.sceneId] || '1'} pgs
-                  </span>
+                  {scene.eighths && (
+                    <span
+                      style={{
+                        fontFamily: RD.display,
+                        fontSize: 10,
+                        fontStyle: 'italic',
+                        color: RD.inkFade,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {scene.eighths} pgs
+                    </span>
+                  )}
                 </div>
 
                 {scene.lines.map((line, li) => (
@@ -684,31 +532,29 @@ function LineContextMenu({ menu, onAction }: LineContextMenuProps) {
 }
 
 interface IndexCardsProps {
-  screenplay: ScreenplayScene[];
-  activeScene: number;
-  changes: ChangeMap;
+  screenplay: ApiScene[];
+  activeScene: string;
   revColor: { border: string };
 }
 
 function IndexCardsView({
   screenplay,
   activeScene,
-  changes,
   revColor,
 }: IndexCardsProps) {
-  const [order, setOrder] = useState<number[]>(
-    screenplay.map(s => s.sceneId),
+  const [order, setOrder] = useState<string[]>(
+    screenplay.map(s => s.id),
   );
   const [whatIf, setWhatIf] = useState(false);
-  const [hoverScene, setHoverScene] = useState<number | null>(null);
+  const [hoverScene, setHoverScene] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
 
   const orderedScenes = order
-    .map(id => screenplay.find(s => s.sceneId === id))
-    .filter((s): s is ScreenplayScene => Boolean(s));
+    .map(id => screenplay.find(s => s.id === id))
+    .filter((s): s is ApiScene => Boolean(s));
   const isReordered = order.some(
-    (id, i) => screenplay[i] && screenplay[i].sceneId !== id,
+    (id, i) => screenplay[i] && screenplay[i].id !== id,
   );
 
   const onDragStart = (i: number) => setDragIdx(i);
@@ -725,7 +571,7 @@ function IndexCardsView({
     setDragIdx(null);
     setDropIdx(null);
   };
-  const resetOrder = () => setOrder(screenplay.map(s => s.sceneId));
+  const resetOrder = () => setOrder(screenplay.map(s => s.id));
 
   return (
     <div
@@ -799,16 +645,11 @@ function IndexCardsView({
         }}
       >
         {orderedScenes.map((scene, si) => {
-          const isActive = scene.sceneId === activeScene;
-          const isHover = hoverScene === scene.sceneId;
+          const isActive = scene.id === activeScene;
+          const isHover = hoverScene === scene.id;
           const isDrop = dropIdx === si && dragIdx !== si;
           const dialogue = scene.lines.filter(l => l.type === 'dialogue');
           const action = scene.lines.filter(l => l.type === 'action');
-          const hasChange = scene.lines.some(
-            l =>
-              l.change &&
-              (changes[l.change.id] || l.change.status) === 'pending',
-          );
           const rotation =
             isActive || isHover
               ? 0
@@ -817,7 +658,7 @@ function IndexCardsView({
 
           return (
             <div
-              key={scene.sceneId}
+              key={scene.id}
               draggable
               onDragStart={() => onDragStart(si)}
               onDragOver={e => onDragOver(e, si)}
@@ -826,7 +667,7 @@ function IndexCardsView({
                 setDragIdx(null);
                 setDropIdx(null);
               }}
-              onMouseEnter={() => setHoverScene(scene.sceneId)}
+              onMouseEnter={() => setHoverScene(scene.id)}
               onMouseLeave={() => setHoverScene(null)}
               style={{
                 padding: '18px 18px 16px',
@@ -869,26 +710,6 @@ function IndexCardsView({
                   boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.15)',
                 }}
               />
-              {hasChange && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 26,
-                    right: 8,
-                    fontFamily: RD.display,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: 1.5,
-                    color: RD.copper,
-                    background: RD.copperSoft,
-                    padding: '1px 6px',
-                    border: `1px solid ${RD.copper}`,
-                    transform: 'rotate(2deg)',
-                  }}
-                >
-                  NOTES
-                </span>
-              )}
 
               <div
                 style={{
@@ -902,7 +723,7 @@ function IndexCardsView({
                   letterSpacing: 0.5,
                 }}
               >
-                <span style={{ color: RD.inkFade }}>{scene.sceneId}.</span>{' '}
+                <span style={{ color: RD.inkFade }}>{scene.position}.</span>{' '}
                 {scene.heading}
               </div>
               <div
@@ -915,8 +736,7 @@ function IndexCardsView({
                   fontFamily: RD.display,
                 }}
               >
-                {SCENE_EIGHTHS[scene.sceneId] || '1'} pgs · {dialogue.length}{' '}
-                dialogue · {action.length} action
+                {scene.eighths || '1'} pgs · {dialogue.length} dialogue · {action.length} action
               </div>
 
               <div
@@ -931,9 +751,7 @@ function IndexCardsView({
                   overflow: 'hidden',
                 }}
               >
-                {action
-                  .map(a => (a.type === 'action' ? a.text : ''))
-                  .join(' ')}
+                {action.map(a => a.text).join(' ')}
               </div>
 
               <div
@@ -951,9 +769,9 @@ function IndexCardsView({
                 }}
               >
                 <span>Position {si + 1}</span>
-                {scene.sceneId !== order[si] && (
+                {scene.id !== order[si] && (
                   <span style={{ color: RD.copper }}>
-                    was Sc.{scene.sceneId}
+                    reordered
                   </span>
                 )}
               </div>

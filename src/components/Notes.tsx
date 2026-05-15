@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { RD } from '../tokens';
 import { NOTE_ORIGINS } from '../data/notes';
-import type { Note, NoteOriginId, NoteStatus, PatternNote } from '../types';
+import type { Note } from '../api/types';
+import type { NoteOriginId, NoteStatus, PatternNote } from '../types';
 
 interface Props {
   notes: Note[];
   patternNotes: PatternNote[];
   activeNote: string;
   setActiveNote: (id: string) => void;
-  activeScene: number;
+  activeScene: string;
 }
 
 type Density = 'sticky' | 'list' | 'sheet';
@@ -70,8 +71,40 @@ export function Notes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Empty state — no notes at all
+  if (notes.length === 0 && patternNotes.length === 0) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: RD.paper,
+          fontFamily: RD.sans,
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: RD.inkFade,
+        }}
+      >
+        <div style={{ fontSize: 36, opacity: 0.2, marginBottom: 10 }}>✉</div>
+        <div
+          style={{
+            fontFamily: RD.display,
+            fontSize: 16,
+            fontStyle: 'italic',
+            marginBottom: 6,
+          }}
+        >
+          Notes
+        </div>
+        <div style={{ fontSize: 11 }}>No notes yet for this screenplay</div>
+      </div>
+    );
+  }
+
+  // Filter by active scene (scenes is string[])
   const filteredNotes = activeScene
-    ? notes.filter(n => (n.scenes || [n.sceneId]).includes(activeScene))
+    ? notes.filter(n => (n.scenes || []).includes(activeScene))
     : notes;
   const noSceneNotes = filteredNotes.length === 0 && Boolean(activeScene);
   const displayNotes = showAll || noSceneNotes ? notes : filteredNotes;
@@ -141,7 +174,7 @@ export function Notes({
                 background: `${RD.copper}15`,
               }}
             >
-              Scene {activeScene} ✕
+              Scene filtered ✕
             </span>
           )}
         </div>
@@ -245,7 +278,7 @@ export function Notes({
             justifyContent: 'space-between',
           }}
         >
-          <span>No notes pinned to Scene {activeScene}</span>
+          <span>No notes pinned to this scene</span>
           <span
             onClick={() => setShowAll(true)}
             style={{
@@ -289,7 +322,7 @@ export function Notes({
           >
             <span></span>
             <span>Title</span>
-            <span>Scene</span>
+            <span>Scenes</span>
             <span>Priority</span>
             <span>Status</span>
           </div>
@@ -300,8 +333,8 @@ export function Notes({
           displayNotes.map((n, i) => {
             const isActive = activeNote === n.id;
             const isMulti = n.scenes && n.scenes.length > 1;
-            const origin = NOTE_ORIGINS[n.origin] || NOTE_ORIGINS.self;
-            const stickyBg = stickyByOrigin[n.origin] || RD.stickyYellow;
+            const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
+            const stickyBg = stickyByOrigin[n.origin as NoteOriginId] || RD.stickyYellow;
             const rotation = isActive ? 0 : rotations[i % rotations.length];
 
             return (
@@ -386,8 +419,10 @@ export function Notes({
                     >
                       — {origin.label}
                       {isMulti
-                        ? `, affecting scenes ${n.scenes!.join(', ')}`
-                        : `, on Scene ${n.sceneId}`}
+                        ? `, affecting ${n.scenes!.length} scenes`
+                        : n.scenes.length > 0
+                        ? `, on a scene`
+                        : ''}
                     </div>
                   </div>
                 </div>
@@ -453,7 +488,7 @@ export function Notes({
           displayNotes.map(n => {
             const isActive = activeNote === n.id;
             const isMulti = n.scenes && n.scenes.length > 1;
-            const origin = NOTE_ORIGINS[n.origin] || NOTE_ORIGINS.self;
+            const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
             const statusColor =
               n.status === 'applied'
                 ? RD.forest
@@ -530,8 +565,10 @@ export function Notes({
                     }}
                   >
                     {isMulti
-                      ? `Scenes ${n.scenes!.join(', ')}`
-                      : `Scene ${n.sceneId}`}
+                      ? `${n.scenes!.length} scenes`
+                      : n.scenes.length > 0
+                      ? `1 scene`
+                      : 'No scene'}
                     <span style={{ margin: '0 5px' }}>·</span>
                     <span
                       style={{
@@ -557,7 +594,7 @@ export function Notes({
           displayNotes.map(n => {
             const isActive = activeNote === n.id;
             const isMulti = n.scenes && n.scenes.length > 1;
-            const origin = NOTE_ORIGINS[n.origin] || NOTE_ORIGINS.self;
+            const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
             const statusColor =
               n.status === 'applied'
                 ? RD.forest
@@ -616,7 +653,7 @@ export function Notes({
                     fontSize: 10,
                   }}
                 >
-                  {isMulti ? `${n.scenes!.length} scns` : `Sc.${n.sceneId}`}
+                  {isMulti ? `${n.scenes!.length} scns` : `1 scn`}
                 </span>
                 <span
                   style={{
@@ -660,7 +697,7 @@ export function Notes({
             );
           })}
 
-        {/* Patterns view */}
+        {/* Patterns view — passed in from parent (empty for MVP-1) */}
         {view === 'pattern' &&
           patternNotes.map(pn => {
             const isActive = activeNote === pn.id;
@@ -756,6 +793,21 @@ export function Notes({
               </div>
             );
           })}
+
+        {view === 'pattern' && patternNotes.length === 0 && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px 20px',
+              color: RD.inkFade,
+              fontFamily: RD.display,
+              fontStyle: 'italic',
+              fontSize: 12,
+            }}
+          >
+            No pattern analysis yet
+          </div>
+        )}
       </div>
     </div>
   );

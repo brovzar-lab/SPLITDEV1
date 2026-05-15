@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { RD } from '../tokens';
 import { AGENTS } from '../data/agents';
-import { CHARACTER_BIBLE } from '../data/characters';
 import { NOTE_ORIGINS } from '../data/notes';
 import { AI_RESPONSES, CHARACTER_LINES } from '../data/responses';
+import type { Note } from '../api/types';
 import type {
   ChatMessage,
   ChatTarget,
-  Note,
+  NoteOriginId,
   PatternNote,
   PinnedMessage,
 } from '../types';
+import type { CharacterBibleEntry } from '../api/types';
 
 interface Props {
   activeNote: string;
@@ -20,6 +21,7 @@ interface Props {
   setChatTarget: (t: ChatTarget) => void;
   notes: Note[];
   patternNotes: PatternNote[];
+  characters: CharacterBibleEntry[];
   openBible: () => void;
 }
 
@@ -31,31 +33,18 @@ export function Chat({
   setChatTarget,
   notes,
   patternNotes,
+  characters,
   openBible,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
   const [typing, setTyping] = useState(false);
-  const [pinned, setPinned] = useState<PinnedMessage[]>([
-    {
-      id: 'p1',
-      text: 'Start mid-action: Sarah on a phone call, not arriving. Hook first.',
-      agent: 'Dialogue',
-      sceneId: 1,
-      color: '#c25e1c',
-    },
-    {
-      id: 'p2',
-      text: 'Sarah deflects with dry humor when scared—lean into that voice rule.',
-      agent: 'Character',
-      sceneId: 7,
-      color: '#3e6e3e',
-    },
-  ]);
+  const [pinned, setPinned] = useState<PinnedMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevNoteRef = useRef<string | null>(null);
 
+  // Combine api notes with legacy pattern notes for lookup
   const allNotes: Array<Note | PatternNote> = [...notes, ...patternNotes];
   const note = allNotes.find(n => n.id === activeNote);
   const target: ChatTarget = chatTarget || { kind: 'agent', id: activeAgent };
@@ -65,7 +54,7 @@ export function Chat({
     ) || AGENTS[1];
   const character =
     target.kind === 'character'
-      ? CHARACTER_BIBLE.find(c => c.id === target.id) || null
+      ? characters.find(c => c.id === target.id) || null
       : null;
 
   useEffect(() => {
@@ -100,7 +89,7 @@ export function Chat({
         {
           id: 'pt2',
           date: '3 days ago',
-          summary: "Sarah's voice in Scene 7",
+          summary: "Character voice in opening scene",
           agent: 'Character',
           color: '#3e6e3e',
         },
@@ -108,14 +97,13 @@ export function Chat({
     : [];
 
   const pinMessage = (msg: ChatMessage) => {
-    const sceneId = note && 'sceneId' in note ? note.sceneId : null;
     setPinned(prev => [
       ...prev,
       {
         id: 'p' + Date.now(),
         text: msg.text,
         agent: (msg.respondent || '').replace(' Agent', ''),
-        sceneId,
+        sceneId: null,
         color: msg.respondentColor || RD.copper,
       },
     ]);
@@ -155,9 +143,10 @@ export function Chat({
     }, 800 + Math.random() * 1000);
   };
 
+  // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =
     note && 'origin' in note
-      ? NOTE_ORIGINS[note.origin] || NOTE_ORIGINS.self
+      ? NOTE_ORIGINS[note.origin as NoteOriginId] || NOTE_ORIGINS.self
       : NOTE_ORIGINS.self;
 
   return (
@@ -233,7 +222,7 @@ export function Chat({
             {typing
               ? 'composing reply…'
               : character
-              ? `in character · ${character.role.toLowerCase()}`
+              ? `in character · ${(character.role || '').toLowerCase()}`
               : `${agent.desc.toLowerCase()}`}
           </div>
         </div>
@@ -379,7 +368,6 @@ export function Chat({
                       }}
                     >
                       {p.agent}
-                      {p.sceneId ? ` · Sc. ${p.sceneId}` : ''}
                     </div>
                     <div style={{ color: RD.ink, lineHeight: 1.45 }}>{p.text}</div>
                   </div>
@@ -743,15 +731,17 @@ export function Chat({
                 </div>
               );
             })}
-            <div
-              style={{
-                width: 1,
-                background: RD.line,
-                margin: '0 4px',
-                flexShrink: 0,
-              }}
-            />
-            {CHARACTER_BIBLE.map(c => {
+            {characters.length > 0 && (
+              <div
+                style={{
+                  width: 1,
+                  background: RD.line,
+                  margin: '0 4px',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {characters.map(c => {
               const isActive =
                 target.kind === 'character' && target.id === c.id;
               return (

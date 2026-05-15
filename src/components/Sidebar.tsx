@@ -1,22 +1,22 @@
 import { Fragment, useState } from 'react';
 import { RD } from '../tokens';
-import { BEATS } from '../data/characters';
-import type { Note, Scene } from '../types';
+import type { Scene, Line, Beat, Note } from '../api/types';
 
 interface Props {
-  activeScene: number;
-  setActiveScene: (id: number) => void;
-  scenes: Scene[];
+  activeScene: string;
+  setActiveScene: (id: string) => void;
+  scenes: Array<Scene & { lines: Line[] }>;
+  beats: Beat[];
   notes: Note[];
 }
 
-export function Sidebar({ activeScene, setActiveScene, scenes, notes }: Props) {
+export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: Props) {
   const [search, setSearch] = useState('');
 
-  const sceneNoteCount: Record<number, number> = {};
+  const sceneNoteCount: Record<string, number> = {};
   scenes.forEach(s => (sceneNoteCount[s.id] = 0));
   notes.forEach(n =>
-    (n.scenes || [n.sceneId]).forEach(sid => {
+    (n.scenes || []).forEach(sid => {
       sceneNoteCount[sid] = (sceneNoteCount[sid] || 0) + 1;
     }),
   );
@@ -105,7 +105,7 @@ export function Sidebar({ activeScene, setActiveScene, scenes, notes }: Props) {
               <div
                 key={s.id}
                 onClick={() => setActiveScene(s.id)}
-                title={`Scene ${s.id}: ${cnt} note${cnt !== 1 ? 's' : ''}`}
+                title={`Scene ${s.position}: ${cnt} note${cnt !== 1 ? 's' : ''}`}
                 style={{
                   flex: 1,
                   height: h,
@@ -125,7 +125,50 @@ export function Sidebar({ activeScene, setActiveScene, scenes, notes }: Props) {
 
       {/* Beats / Scenes */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 14px' }}>
-        {BEATS.map((beat, bi) => {
+        {beats.length === 0 ? (
+          // Flat scene list when no beats defined
+          filteredScenes.map(s => {
+            const isActive = s.id === activeScene;
+            const noteCount = sceneNoteCount[s.id] || 0;
+            return (
+              <div
+                key={s.id}
+                onClick={() => setActiveScene(s.id)}
+                style={{
+                  padding: '5px 8px 5px 22px',
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  color: isActive ? RD.copper : RD.inkSoft,
+                  fontWeight: isActive ? 600 : 400,
+                  background: isActive ? 'rgba(194,94,28,0.08)' : 'transparent',
+                  borderLeft: isActive ? `2px solid ${RD.copper}` : '2px solid transparent',
+                  marginLeft: 0,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: RD.inkFade, marginRight: 6 }}>
+                    {s.position}.
+                  </span>
+                  {s.heading.replace(/^(INT|EXT)\.\s+/, '')}
+                </span>
+                {noteCount > 0 && (
+                  <span style={{
+                    width: 16, height: 16, borderRadius: '50%', background: RD.gold, color: RD.ink,
+                    fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', marginLeft: 6, flexShrink: 0,
+                    boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.15)',
+                  }}>
+                    {noteCount}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        ) : (
+        beats.map((beat, bi) => {
           const beatScenes = filteredScenes.filter(s => beat.scenes.includes(s.id));
           if (beatScenes.length === 0) return null;
 
@@ -230,7 +273,7 @@ export function Sidebar({ activeScene, setActiveScene, scenes, notes }: Props) {
                             marginRight: 6,
                           }}
                         >
-                          {s.id}.
+                          {s.position}.
                         </span>
                         {s.heading.replace(/^(INT|EXT)\.\s+/, '')}
                       </span>
@@ -261,7 +304,8 @@ export function Sidebar({ activeScene, setActiveScene, scenes, notes }: Props) {
               </div>
             </Fragment>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );
