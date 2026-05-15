@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { RD } from '../tokens';
 import { NOTE_ORIGINS } from '../data/notes';
 import type { Note } from '../api/types';
+import { api } from '../api/client';
 import type { NoteOriginId, NoteStatus, PatternNote } from '../types';
 
 interface Props {
@@ -11,6 +12,10 @@ interface Props {
   activeNote: string;
   setActiveNote: (id: string) => void;
   activeScene: string;
+  // NEW:
+  screenplayId: string;
+  onNoteCreated: (note: Note) => void;
+  onNoteDeleted: (id: string) => void;
 }
 
 type Density = 'sticky' | 'list' | 'sheet';
@@ -61,10 +66,54 @@ export function Notes({
   activeNote,
   setActiveNote,
   activeScene,
+  screenplayId,
+  onNoteCreated,
+  onNoteDeleted,
 }: Props) {
   const [view, setView] = useState<View>('scene');
   const [showAll, setShowAll] = useState(false);
   const [density, setDensity] = useState<Density>('sticky');
+
+  const [newOpen, setNewOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    setCreating(true);
+    try {
+      const { note } = await api.createNote(screenplayId, {
+        title: newTitle.trim(),
+        body: newBody.trim(),
+        scenes: activeScene ? [activeScene] : [],
+        priority: newPriority,
+        status: 'unread',
+        origin: 'self',
+        confidence: null,
+      });
+      onNoteCreated(note);
+      setNewTitle('');
+      setNewBody('');
+      setNewOpen(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this note?')) return;
+    try {
+      await api.deleteNote(id);
+      onNoteDeleted(id);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     if (notes.length > 8 && density === 'sticky') setDensity('list');
@@ -81,23 +130,171 @@ export function Notes({
           height: '100%',
           background: RD.paper,
           fontFamily: RD.sans,
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: RD.inkFade,
         }}
       >
-        <div style={{ fontSize: 36, opacity: 0.2, marginBottom: 10 }}>✉</div>
+        {/* Empty state header with create button */}
         <div
           style={{
-            fontFamily: RD.display,
-            fontSize: 16,
-            fontStyle: 'italic',
-            marginBottom: 6,
+            padding: '14px 16px 10px',
+            borderBottom: `1px solid ${RD.line}`,
+            background: RD.paperDeep,
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          Notes
+          <div
+            style={{
+              fontFamily: RD.display,
+              fontSize: 22,
+              fontWeight: 600,
+              color: RD.ink,
+              fontStyle: 'italic',
+              lineHeight: 1,
+            }}
+          >
+            Notes
+          </div>
+          <button
+            onClick={() => setNewOpen(o => !o)}
+            style={{
+              padding: '4px 10px',
+              fontSize: 10,
+              fontFamily: RD.display,
+              fontWeight: 700,
+              letterSpacing: 1,
+              textTransform: 'uppercase',
+              background: RD.copper,
+              color: RD.paper,
+              border: 'none',
+              borderRadius: 2,
+              cursor: 'pointer',
+            }}
+          >
+            + New note
+          </button>
         </div>
-        <div style={{ fontSize: 11 }}>No notes yet for this screenplay</div>
+
+        {newOpen && (
+          <div
+            style={{
+              padding: '12px 14px',
+              background: RD.card,
+              borderBottom: `1px solid ${RD.line}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <input
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              placeholder="Note title…"
+              style={{
+                padding: '8px 12px',
+                border: `1px solid ${RD.line}`,
+                background: RD.paper,
+                fontSize: 13,
+                fontFamily: RD.display,
+                fontStyle: 'italic',
+                color: RD.ink,
+                outline: 'none',
+              }}
+            />
+            <textarea
+              value={newBody}
+              onChange={e => setNewBody(e.target.value)}
+              placeholder="What's the note?"
+              rows={3}
+              style={{
+                padding: '8px 12px',
+                border: `1px solid ${RD.line}`,
+                background: RD.paper,
+                fontSize: 12,
+                fontFamily: RD.sans,
+                color: RD.ink,
+                outline: 'none',
+                resize: 'vertical',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                value={newPriority}
+                onChange={e => setNewPriority(e.target.value as 'high' | 'medium' | 'low')}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontFamily: RD.sans,
+                  border: `1px solid ${RD.line}`,
+                  background: RD.paper,
+                  color: RD.ink,
+                }}
+              >
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => { setNewOpen(false); setNewTitle(''); setNewBody(''); }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontFamily: RD.display,
+                  background: 'transparent',
+                  border: `1px solid ${RD.line}`,
+                  color: RD.inkSoft,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!newTitle.trim() || creating}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: 11,
+                  fontFamily: RD.display,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                  background: newTitle.trim() && !creating ? RD.copper : RD.lineDeep,
+                  color: RD.paper,
+                  border: 'none',
+                  cursor: newTitle.trim() && !creating ? 'pointer' : 'default',
+                }}
+              >
+                {creating ? 'Adding…' : 'Add note'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: RD.inkFade,
+          }}
+        >
+          <div style={{ fontSize: 36, opacity: 0.2, marginBottom: 10 }}>✉</div>
+          <div
+            style={{
+              fontFamily: RD.display,
+              fontSize: 16,
+              fontStyle: 'italic',
+              marginBottom: 6,
+            }}
+          >
+            Notes
+          </div>
+          <div style={{ fontSize: 11 }}>No notes yet for this screenplay</div>
+        </div>
       </div>
     );
   }
@@ -160,23 +357,43 @@ export function Notes({
               From the desk
             </div>
           </div>
-          {activeScene && view === 'scene' && !noSceneNotes && !showAll && (
-            <span
-              onClick={() => setShowAll(true)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {activeScene && view === 'scene' && !noSceneNotes && !showAll && (
+              <span
+                onClick={() => setShowAll(true)}
+                style={{
+                  fontSize: 10,
+                  color: RD.copper,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '2px 7px',
+                  borderRadius: 2,
+                  border: `1px solid ${RD.copper}40`,
+                  background: `${RD.copper}15`,
+                }}
+              >
+                Scene filtered ✕
+              </span>
+            )}
+            <button
+              onClick={() => setNewOpen(o => !o)}
               style={{
+                padding: '4px 10px',
                 fontSize: 10,
-                color: RD.copper,
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '2px 7px',
+                fontFamily: RD.display,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                background: RD.copper,
+                color: RD.paper,
+                border: 'none',
                 borderRadius: 2,
-                border: `1px solid ${RD.copper}40`,
-                background: `${RD.copper}15`,
+                cursor: 'pointer',
               }}
             >
-              Scene filtered ✕
-            </span>
-          )}
+              + New note
+            </button>
+          </div>
         </div>
 
         <div
@@ -266,6 +483,103 @@ export function Notes({
         </div>
       </div>
 
+      {newOpen && (
+        <div
+          style={{
+            padding: '12px 14px',
+            background: RD.card,
+            borderBottom: `1px solid ${RD.line}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <input
+            value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            placeholder="Note title…"
+            style={{
+              padding: '8px 12px',
+              border: `1px solid ${RD.line}`,
+              background: RD.paper,
+              fontSize: 13,
+              fontFamily: RD.display,
+              fontStyle: 'italic',
+              color: RD.ink,
+              outline: 'none',
+            }}
+          />
+          <textarea
+            value={newBody}
+            onChange={e => setNewBody(e.target.value)}
+            placeholder="What's the note?"
+            rows={3}
+            style={{
+              padding: '8px 12px',
+              border: `1px solid ${RD.line}`,
+              background: RD.paper,
+              fontSize: 12,
+              fontFamily: RD.sans,
+              color: RD.ink,
+              outline: 'none',
+              resize: 'vertical',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={newPriority}
+              onChange={e => setNewPriority(e.target.value as 'high' | 'medium' | 'low')}
+              style={{
+                padding: '4px 8px',
+                fontSize: 11,
+                fontFamily: RD.sans,
+                border: `1px solid ${RD.line}`,
+                background: RD.paper,
+                color: RD.ink,
+              }}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={() => { setNewOpen(false); setNewTitle(''); setNewBody(''); }}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11,
+                fontFamily: RD.display,
+                background: 'transparent',
+                border: `1px solid ${RD.line}`,
+                color: RD.inkSoft,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!newTitle.trim() || creating}
+              style={{
+                padding: '4px 12px',
+                fontSize: 11,
+                fontFamily: RD.display,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                background: newTitle.trim() && !creating ? RD.copper : RD.lineDeep,
+                color: RD.paper,
+                border: 'none',
+                cursor: newTitle.trim() && !creating ? 'pointer' : 'default',
+              }}
+            >
+              {creating ? 'Adding…' : 'Add note'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {noSceneNotes && !showAll && view === 'scene' && (
         <div
           style={{
@@ -305,7 +619,7 @@ export function Notes({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '24px 1fr 60px 70px 80px',
+              gridTemplateColumns: '24px 1fr 60px 70px 80px 24px',
               gap: 8,
               padding: '8px 12px',
               fontSize: 9,
@@ -325,6 +639,7 @@ export function Notes({
             <span>Scenes</span>
             <span>Priority</span>
             <span>Status</span>
+            <span></span>
           </div>
         )}
 
@@ -366,6 +681,24 @@ export function Notes({
                     boxShadow: '0 1px 2px rgba(60,40,20,0.06)',
                   }}
                 />
+
+                <span
+                  onClick={(e) => handleDelete(n.id, e)}
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 8,
+                    fontSize: 14,
+                    color: RD.inkFade,
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    borderRadius: 2,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
+                >
+                  ×
+                </span>
 
                 <div
                   style={{
@@ -500,7 +833,8 @@ export function Notes({
                 key={n.id}
                 onClick={() => setActiveNote(n.id)}
                 style={{
-                  padding: '10px 14px',
+                  position: 'relative',
+                  padding: '10px 36px 10px 14px',
                   cursor: 'pointer',
                   background: isActive ? RD.copperSoft + '60' : 'transparent',
                   borderBottom: `1px solid ${RD.line}`,
@@ -584,6 +918,23 @@ export function Notes({
                     </span>
                   </div>
                 </div>
+                <span
+                  onClick={(e) => handleDelete(n.id, e)}
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 8,
+                    fontSize: 14,
+                    color: RD.inkFade,
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    borderRadius: 2,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
+                >
+                  ×
+                </span>
               </div>
             );
           })}
@@ -606,8 +957,9 @@ export function Notes({
                 key={n.id}
                 onClick={() => setActiveNote(n.id)}
                 style={{
+                  position: 'relative',
                   display: 'grid',
-                  gridTemplateColumns: '24px 1fr 60px 70px 80px',
+                  gridTemplateColumns: '24px 1fr 60px 70px 80px 24px',
                   gap: 8,
                   padding: '7px 12px',
                   cursor: 'pointer',
@@ -692,6 +1044,21 @@ export function Notes({
                     }}
                   />
                   {n.status}
+                </span>
+                <span
+                  onClick={(e) => handleDelete(n.id, e)}
+                  style={{
+                    fontSize: 14,
+                    color: RD.inkFade,
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    borderRadius: 2,
+                    textAlign: 'center',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
+                >
+                  ×
                 </span>
               </div>
             );

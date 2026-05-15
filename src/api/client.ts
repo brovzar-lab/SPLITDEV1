@@ -42,6 +42,7 @@ export const api = {
     }),
   patchNote: (id: string, patch: Partial<Omit<Note, 'id' | 'screenplay_id' | 'created_at'>>) =>
     request<{ note: Note }>(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteNote: (id: string) => request<void>(`/api/notes/${id}`, { method: 'DELETE' }),
 
   exportUrl: (id: string, format: 'fountain' | 'fdx') =>
     `/api/screenplays/${id}/export?format=${format}`,

@@ -12,7 +12,7 @@ import { Divider } from '../components/Divider';
 import { useScreenplay } from '../hooks/useScreenplay';
 import { useAutosave, type SaveStatus } from '../hooks/useAutosave';
 import { api } from '../api/client';
-import type { Line, Scene } from '../api/types';
+import type { Line, Note, Scene } from '../api/types';
 import type { ChatTarget } from '../types';
 
 function getNoteScenes(note: { scenes?: string[] } | undefined): string[] {
@@ -174,6 +174,16 @@ export default function Editor() {
     }
   };
 
+  const handleNoteCreated = (note: Note) => {
+    setData(prev => prev ? { ...prev, notes: [...prev.notes, note] } : prev);
+    setActiveNote(note.id);
+  };
+
+  const handleNoteDeleted = (id: string) => {
+    setData(prev => prev ? { ...prev, notes: prev.notes.filter(n => n.id !== id) } : prev);
+    if (activeNote === id) setActiveNote('');
+  };
+
   // Page math — approximate using line counts
   const linesPerPage = 55;
   const totalLines = scenes.reduce((sum, s) => sum + s.lines.length + 3, 0);
@@ -276,6 +286,9 @@ export default function Editor() {
               activeNote={activeNote}
               setActiveNote={handleNoteSelect}
               activeScene={effectiveActiveScene}
+              screenplayId={data.screenplay.id}
+              onNoteCreated={handleNoteCreated}
+              onNoteDeleted={handleNoteDeleted}
             />
           </div>
           <Divider
