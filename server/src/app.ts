@@ -1,6 +1,8 @@
 import express from 'express';
 import health from './routes/health.js';
 import screenplays from './routes/screenplays.js';
+import scenes from './routes/scenes.js';
+import lines from './routes/lines.js';
 import { openDb, type DB } from './db/index.js';
 import { env } from './env.js';
 
@@ -15,5 +17,7 @@ export function buildApp(deps: AppDeps = {}) {
   app.locals.db = db;
   app.use('/api', health);
   app.use('/api/screenplays', screenplays);
+  app.use('/api/scenes', scenes);
+  app.use('/api/lines', lines);
   return app;
 }
