@@ -1,4 +1,4 @@
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import type { ParsedScreenplay, ParsedScene, ParsedLine } from './types.js';
 
 interface FdxParagraph {
@@ -72,4 +72,45 @@ export function parseFdx(source: string): ParsedScreenplay {
   }
 
   return { title: titleText, author, scenes };
+}
+
+const builder = new XMLBuilder({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  format: true,
+  suppressEmptyNode: false,
+});
+
+export function serializeFdx(ps: ParsedScreenplay): string {
+  const paragraphs: Array<{ '@_Type': string; Text: string }> = [];
+  for (const scene of ps.scenes) {
+    paragraphs.push({ '@_Type': 'Scene Heading', Text: scene.heading });
+    for (const l of scene.lines) {
+      if (l.type === 'action') {
+        paragraphs.push({ '@_Type': 'Action', Text: l.text });
+      } else {
+        paragraphs.push({ '@_Type': 'Character', Text: l.character ?? 'UNKNOWN' });
+        if (l.parenthetical) paragraphs.push({ '@_Type': 'Parenthetical', Text: `(${l.parenthetical})` });
+        paragraphs.push({ '@_Type': 'Dialogue', Text: l.text });
+      }
+    }
+  }
+  const doc = {
+    '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8', '@_standalone': 'no' },
+    FinalDraft: {
+      '@_DocumentType': 'Script',
+      '@_Template': 'No',
+      '@_Version': '5',
+      Content: { Paragraph: paragraphs },
+      TitlePage: {
+        Content: {
+          Paragraph: [
+            { Text: ps.title },
+            ...(ps.author ? [{ Text: `by ${ps.author}` }] : []),
+          ],
+        },
+      },
+    },
+  };
+  return builder.build(doc);
 }
