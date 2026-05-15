@@ -41,9 +41,11 @@ export default function Editor() {
 
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
+    { getKey: ({ id }) => `line:${id}` },
   );
   const sceneSave = useAutosave<{ id: string; patch: Partial<Scene> }>(
     ({ id, patch }) => api.patchScene(id, patch),
+    { getKey: ({ id }) => `scene:${id}` },
   );
 
   const onLineEdit = (id: string, patch: Partial<Line>) => {

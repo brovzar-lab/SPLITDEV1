@@ -85,6 +85,7 @@ Implementation plan: [`docs/superpowers/plans/2026-05-14-splitdev1-mvp1.md`](doc
 - **Lossy round-trip**: features the structured model doesn't capture (FDX transitions, dual dialogue, in-script script-notes, Fountain boneyards) survive only in `screenplay.source_text` and are dropped on re-export. The original upload is preserved in the DB if you ever need to recover it.
 - **No auth**: server binds to `127.0.0.1` only, single-user local.
 - **No undo/redo across sessions**: `revision_entry` powers the Editor's Log footer when present, but reverting isn't wired yet.
+- **Editor's Log (revision_entry) is wired in the DB but not yet populated by any route.** The History footer currently renders an empty state. Fully wiring it requires the chat "Apply" flow and per-note revision recording, both deferred to MVP-2.
 - **AI cost on the user**: every chat message hits Anthropic. No caching, no rate limit.
 - **Notes / Bible / Beats start empty** on upload — you add them through the UI.
 

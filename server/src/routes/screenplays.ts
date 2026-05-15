@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { listScreenplays, createScreenplay, getScreenplay, deleteScreenplay } from '../models/screenplay.js';
+import { listScreenplays, createScreenplay, getScreenplay, updateScreenplay, deleteScreenplay } from '../models/screenplay.js';
 import { insertScene, listScenes } from '../models/scene.js';
 import { insertLine, listLines } from '../models/line.js';
 import { listNotes } from '../models/note.js';
@@ -78,6 +78,14 @@ r.get('/:id', (req, res) => {
     characterBible: listCharacterBible(db, sp.id),
     beats: listBeats(db, sp.id),
   });
+});
+
+r.patch('/:id', (req, res) => {
+  const updated = updateScreenplay(req.app.locals.db, req.params.id, req.body);
+  if (!updated) return res.status(404).json({ error: 'not found', code: 'not_found' });
+  // Strip source_text from response
+  const { source_text, ...rest } = updated;
+  res.json({ screenplay: rest });
 });
 
 r.delete('/:id', (req, res) => {

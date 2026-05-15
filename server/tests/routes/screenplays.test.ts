@@ -85,6 +85,27 @@ describe('GET /api/screenplays/:id', () => {
   });
 });
 
+describe('PATCH /api/screenplays/:id', () => {
+  it('updates title and author', async () => {
+    const db = openDb(':memory:');
+    const app = buildApp({ db });
+    const fountain = readFileSync(join(fixtureDir, 'the-cabin.fountain'));
+    const up = await request(app).post('/api/screenplays').attach('file', fountain, 'the-cabin.fountain');
+    const id = up.body.screenplay.id;
+    const res = await request(app).patch(`/api/screenplays/${id}`).send({ title: 'Renamed', author: 'New Author' });
+    expect(res.status).toBe(200);
+    expect(res.body.screenplay.title).toBe('Renamed');
+    expect(res.body.screenplay.author).toBe('New Author');
+    expect(res.body.screenplay).not.toHaveProperty('source_text');
+  });
+
+  it('returns 404 on missing id', async () => {
+    const app = buildApp({ db: openDb(':memory:') });
+    const res = await request(app).patch('/api/screenplays/missing').send({ title: 'X' });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('DELETE /api/screenplays/:id', () => {
   it('deletes a screenplay and cascades', async () => {
     const db = openDb(':memory:');

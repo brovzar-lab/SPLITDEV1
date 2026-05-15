@@ -62,6 +62,18 @@ export function Chat({
       ? characters.find(c => c.id === target.id) || null
       : null;
 
+  // Derived display values — must be above effects that reference them
+  const respondent = character ? character.name : `${agent.name} Agent`;
+  const respondentColor = character ? character.color : agent.color;
+
+  // Snapshot the respondent identity at send() time so target switches
+  // mid-stream don't mis-stamp the finalized AI message.
+  const streamRespondentRef = useRef<{ name: string; color: string; inCharacter: boolean }>({
+    name: respondent,
+    color: respondentColor,
+    inCharacter: !!character,
+  });
+
   useEffect(() => {
     if (activeNote !== prevNoteRef.current) {
       prevNoteRef.current = activeNote;
@@ -79,27 +91,26 @@ export function Chat({
     }
   }, [messages, streaming, reply.text]);
 
-  // Finalize the streaming reply into the messages list when done
+  // Finalize the streaming reply into the messages list when done.
+  // Read from the snapshot ref so the stamped identity is the one that was
+  // active when the user hit Send, not whatever the UI shows now.
   useEffect(() => {
     if (reply.done && reply.text) {
+      const snap = streamRespondentRef.current;
       setMessages(prev => [
         ...prev,
         {
           role: 'ai',
           text: reply.text,
-          respondent,
-          respondentColor,
-          inCharacter: !!character,
-          showApply: !character,
+          respondent: snap.name,
+          respondentColor: snap.color,
+          inCharacter: snap.inCharacter,
+          showApply: !snap.inCharacter,
           voiceMatch: reply.voiceMatch,
         },
       ]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reply.done]);
-
-  const respondent = character ? character.name : `${agent.name} Agent`;
-  const respondentColor = character ? character.color : agent.color;
+  }, [reply.done, reply.text, reply.voiceMatch]);
 
   const previousThreads = note
     ? [
@@ -138,6 +149,13 @@ export function Chat({
   const send = useCallback(() => {
     const text = inputVal.trim();
     if (!text || !screenplayId) return;
+    // Snapshot target identity before the async stream begins so any
+    // mid-stream target switch doesn't corrupt the finalized message.
+    streamRespondentRef.current = {
+      name: respondent,
+      color: respondentColor,
+      inCharacter: !!character,
+    };
     setMessages(prev => [...prev, { role: 'user', text }]);
     setInputVal('');
     streamSend({
@@ -146,7 +164,7 @@ export function Chat({
       target,
       message: text,
     }).catch(err => console.error('[chat stream]', err));
-  }, [inputVal, screenplayId, noteId, target, streamSend]);
+  }, [inputVal, screenplayId, noteId, target, streamSend, respondent, respondentColor, character]);
 
   // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =

@@ -26,6 +26,10 @@ export const api = {
   },
   deleteScreenplay: (id: string) =>
     request<void>(`/api/screenplays/${id}`, { method: 'DELETE' }),
+  patchScreenplay: (id: string, patch: { title?: string; author?: string | null }) =>
+    request<{ screenplay: Omit<Screenplay, 'source_text'> }>(`/api/screenplays/${id}`, {
+      method: 'PATCH', body: JSON.stringify(patch),
+    }),
 
   patchLine: (id: string, patch: Partial<Pick<Line, 'text' | 'character' | 'parenthetical' | 'type'>>) =>
     request<{ line: Line }>(`/api/lines/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
