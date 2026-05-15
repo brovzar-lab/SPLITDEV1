@@ -1,4 +1,5 @@
 export type SourceFormat = 'fountain' | 'fdx';
+export type TriageStatus = 'pending' | 'running' | 'done' | 'failed';
 export type LineType = 'action' | 'dialogue';
 export type NotePriority = 'high' | 'medium' | 'low';
 export type NoteStatus = 'unread' | 'discussing' | 'applied';
@@ -10,6 +11,8 @@ export interface Screenplay {
   author: string | null;
   source_format: SourceFormat;
   source_text: string;
+  triage_status: TriageStatus;
+  triage_error: string | null;
   created_at: number;
   updated_at: number;
 }

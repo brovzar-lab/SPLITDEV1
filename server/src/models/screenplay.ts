@@ -19,17 +19,19 @@ export function createScreenplay(db: DB, input: CreateScreenplayInput): Screenpl
     author: input.author,
     source_format: input.source_format,
     source_text: input.source_text,
+    triage_status: 'pending',
+    triage_error: null,
     created_at: now,
     updated_at: now,
   };
   db.prepare(`INSERT INTO screenplay
-    (id, title, author, source_format, source_text, created_at, updated_at)
-    VALUES (@id, @title, @author, @source_format, @source_text, @created_at, @updated_at)`).run(row);
+    (id, title, author, source_format, source_text, triage_status, triage_error, created_at, updated_at)
+    VALUES (@id, @title, @author, @source_format, @source_text, @triage_status, @triage_error, @created_at, @updated_at)`).run(row);
   return row;
 }
 
 export function listScreenplays(db: DB): Array<Omit<Screenplay, 'source_text'>> {
-  return db.prepare(`SELECT id, title, author, source_format, created_at, updated_at
+  return db.prepare(`SELECT id, title, author, source_format, triage_status, triage_error, created_at, updated_at
     FROM screenplay ORDER BY updated_at DESC, id DESC`).all() as Array<Omit<Screenplay, 'source_text'>>;
 }
 
