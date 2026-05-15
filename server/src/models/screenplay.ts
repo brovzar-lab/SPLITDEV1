@@ -10,17 +10,8 @@ export interface CreateScreenplayInput {
   source_text: string;
 }
 
-// Monotonic timestamp: always strictly greater than the last issued value,
-// even when Date.now() returns the same ms (e.g. rapid same-tick inserts in tests).
-let _lastTs = 0;
-function monotonicNow(): number {
-  const t = Date.now();
-  _lastTs = t > _lastTs ? t : _lastTs + 1;
-  return _lastTs;
-}
-
 export function createScreenplay(db: DB, input: CreateScreenplayInput): Screenplay {
-  const now = monotonicNow();
+  const now = Date.now();
   const id = input.id ?? randomUUID();
   const row: Screenplay = {
     id,
@@ -39,7 +30,7 @@ export function createScreenplay(db: DB, input: CreateScreenplayInput): Screenpl
 
 export function listScreenplays(db: DB): Array<Omit<Screenplay, 'source_text'>> {
   return db.prepare(`SELECT id, title, author, source_format, created_at, updated_at
-    FROM screenplay ORDER BY updated_at DESC`).all() as Array<Omit<Screenplay, 'source_text'>>;
+    FROM screenplay ORDER BY updated_at DESC, id DESC`).all() as Array<Omit<Screenplay, 'source_text'>>;
 }
 
 export function getScreenplay(db: DB, id: string): Screenplay | null {
