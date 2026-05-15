@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { listScreenplays, createScreenplay, getScreenplay } from '../models/screenplay.js';
+import { listScreenplays, createScreenplay, getScreenplay, deleteScreenplay } from '../models/screenplay.js';
 import { insertScene, listScenes } from '../models/scene.js';
 import { insertLine, listLines } from '../models/line.js';
 import { listNotes } from '../models/note.js';
@@ -78,6 +78,11 @@ r.get('/:id', (req, res) => {
     characterBible: listCharacterBible(db, sp.id),
     beats: listBeats(db, sp.id),
   });
+});
+
+r.delete('/:id', (req, res) => {
+  const ok = deleteScreenplay(req.app.locals.db, req.params.id);
+  res.status(ok ? 204 : 404).end();
 });
 
 export default r;

@@ -84,3 +84,23 @@ describe('GET /api/screenplays/:id', () => {
     expect(res.body.beats).toEqual([]);
   });
 });
+
+describe('DELETE /api/screenplays/:id', () => {
+  it('deletes a screenplay and cascades', async () => {
+    const db = openDb(':memory:');
+    const app = buildApp({ db });
+    const fountain = readFileSync(join(fixtureDir, 'the-cabin.fountain'));
+    const up = await request(app).post('/api/screenplays').attach('file', fountain, 'the-cabin.fountain');
+    const id = up.body.screenplay.id;
+    const del = await request(app).delete(`/api/screenplays/${id}`);
+    expect(del.status).toBe(204);
+    const get = await request(app).get(`/api/screenplays/${id}`);
+    expect(get.status).toBe(404);
+  });
+
+  it('returns 404 on missing id', async () => {
+    const app = buildApp({ db: openDb(':memory:') });
+    const res = await request(app).delete('/api/screenplays/missing');
+    expect(res.status).toBe(404);
+  });
+});
