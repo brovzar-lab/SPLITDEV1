@@ -1,14 +1,5 @@
-import { Fountain } from 'fountain-js';
+import { Fountain, type Token } from 'fountain-js';
 import type { ParsedScreenplay, ParsedScene, ParsedLine } from './types.js';
-
-// fountain-js Token interface (kept minimal to avoid importing loose types)
-interface FountainToken {
-  type: string;
-  text?: string;
-  scene_number?: string;
-  dual?: string;
-  is_title?: boolean;
-}
 
 export function parseFountain(source: string): ParsedScreenplay {
   const f = new Fountain();
@@ -20,7 +11,7 @@ export function parseFountain(source: string): ParsedScreenplay {
 
   // Scan the full token list for the author token (title page tokens come first)
   let author: string | undefined;
-  for (const tok of out.tokens as FountainToken[]) {
+  for (const tok of out.tokens) {
     if (tok.type === 'author' || tok.type === 'authors') {
       author = tok.text?.trim();
       break;
@@ -32,7 +23,7 @@ export function parseFountain(source: string): ParsedScreenplay {
   let lastCharacter: string | undefined;
   let lastParenthetical: string | undefined;
 
-  for (const tok of out.tokens as FountainToken[]) {
+  for (const tok of out.tokens) {
     switch (tok.type) {
       case 'scene_heading': {
         current = { heading: stripBracketSceneNumber(tok.text ?? ''), lines: [] };
