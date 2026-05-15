@@ -10,6 +10,9 @@ import { Bible } from '../components/Bible';
 import { History } from '../components/History';
 import { Divider } from '../components/Divider';
 import { useScreenplay } from '../hooks/useScreenplay';
+import { useAutosave, type SaveStatus } from '../hooks/useAutosave';
+import { api } from '../api/client';
+import type { Line, Scene } from '../api/types';
 import type { ChatTarget } from '../types';
 
 function getNoteScenes(note: { scenes?: string[] } | undefined): string[] {
@@ -19,7 +22,7 @@ function getNoteScenes(note: { scenes?: string[] } | undefined): string[] {
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
-  const { data, loading, error } = useScreenplay(id);
+  const { data, setData, loading, error } = useScreenplay(id);
 
   const [activeScene, setActiveScene] = useState<string>('');
   const [activeNote, setActiveNote] = useState('');
@@ -35,6 +38,43 @@ export default function Editor() {
   const [viewMode, setViewMode] = useState<'script' | 'cards'>('script');
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
+
+  const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
+    ({ id, patch }) => api.patchLine(id, patch),
+  );
+  const sceneSave = useAutosave<{ id: string; patch: Partial<Scene> }>(
+    ({ id, patch }) => api.patchScene(id, patch),
+  );
+
+  const onLineEdit = (id: string, patch: Partial<Line>) => {
+    setData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        scenes: prev.scenes.map(s => ({
+          ...s,
+          lines: s.lines.map(l => (l.id === id ? { ...l, ...patch } : l)),
+        })),
+      };
+    });
+    lineSave.trigger({ id, patch });
+  };
+
+  const onSceneEdit = (id: string, patch: Partial<Scene>) => {
+    setData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        scenes: prev.scenes.map(s => (s.id === id ? { ...s, ...patch } : s)),
+      };
+    });
+    sceneSave.trigger({ id, patch });
+  };
+
+  const saveStatus: SaveStatus =
+    [lineSave.status, sceneSave.status].includes('error') ? 'error' :
+    [lineSave.status, sceneSave.status].includes('pending') ? 'pending' :
+    [lineSave.status, sceneSave.status].includes('saved') ? 'saved' : 'idle';
 
   const middleRef = useRef<HTMLDivElement>(null);
 
@@ -174,6 +214,7 @@ export default function Editor() {
         author={screenplay.author}
         sceneCount={scenes.length}
         characters={characterBible}
+        saveStatus={saveStatus}
       />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
@@ -202,6 +243,8 @@ export default function Editor() {
             characterFilter={characterFilter}
             revisionColor={revisionColor}
             onLineAction={handleLineAction}
+            onLineEdit={onLineEdit}
+            onSceneEdit={onSceneEdit}
             title={screenplay.title}
             author={screenplay.author ?? undefined}
           />

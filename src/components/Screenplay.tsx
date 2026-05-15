@@ -16,6 +16,8 @@ interface ScreenplayProps {
   characterFilter: string | null;
   revisionColor: string;
   onLineAction?: (action: string, text: string) => void;
+  onLineEdit?: (id: string, patch: Partial<Line>) => void;
+  onSceneEdit?: (id: string, patch: Partial<Scene>) => void;
   title?: string;
   author?: string;
 }
@@ -55,6 +57,8 @@ export function Screenplay({
   viewMode,
   revisionColor,
   onLineAction,
+  onLineEdit,
+  onSceneEdit,
   title,
   author,
 }: ScreenplayProps) {
@@ -147,6 +151,7 @@ export function Screenplay({
             style={{ fontWeight: 700, textTransform: 'uppercase', outline: 'none' }}
             contentEditable
             suppressContentEditableWarning
+            onBlur={e => onLineEdit?.(line.id, { character: e.currentTarget.textContent ?? '' })}
           >
             {line.character}
           </div>
@@ -155,11 +160,17 @@ export function Screenplay({
               style={{ fontSize: 12, color: RD.inkSoft, outline: 'none' }}
               contentEditable
               suppressContentEditableWarning
+              onBlur={e => onLineEdit?.(line.id, { parenthetical: e.currentTarget.textContent ?? '' })}
             >
               ({line.parenthetical})
             </div>
           )}
-          <div style={{ outline: 'none' }} contentEditable suppressContentEditableWarning>
+          <div
+            style={{ outline: 'none' }}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
+          >
             {line.text}
           </div>
         </div>,
@@ -178,6 +189,7 @@ export function Screenplay({
         }}
         contentEditable
         suppressContentEditableWarning
+        onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
       >
         {line.text}
       </div>,
@@ -333,6 +345,7 @@ export function Screenplay({
                     style={{ flex: 1, outline: 'none' }}
                     contentEditable
                     suppressContentEditableWarning
+                    onBlur={e => onSceneEdit?.(scene.id, { heading: e.currentTarget.textContent ?? '' })}
                   >
                     {scene.heading}
                   </span>

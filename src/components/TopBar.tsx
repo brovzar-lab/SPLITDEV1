@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
 import type { CharacterBibleEntry } from '../api/types';
+import { SaveIndicator } from './Editor/SaveIndicator';
+import type { SaveStatus } from '../hooks/useAutosave';
 
 interface TopBarProps {
   revisionColor: string;
@@ -17,6 +19,7 @@ interface TopBarProps {
   author?: string | null;
   sceneCount?: number;
   characters: CharacterBibleEntry[];
+  saveStatus: SaveStatus;
 }
 
 export function TopBar({
@@ -30,6 +33,7 @@ export function TopBar({
   author,
   sceneCount,
   characters,
+  saveStatus,
 }: TopBarProps) {
   const [showRev, setShowRev] = useState(false);
   const currentRev =
@@ -276,6 +280,9 @@ export function TopBar({
           >
             p. {pageCount} <span style={{ opacity: 0.4 }}>/ {totalPages}</span>
           </div>
+
+          {/* Save indicator */}
+          <SaveIndicator status={saveStatus} />
 
           {/* View ribbon */}
           <div
