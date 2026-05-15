@@ -8,7 +8,7 @@ export default function Library() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', fontFamily: RD.sans, background: RD.paper, overflow: 'auto' }}>
       <header style={{ padding: '40px 56px 24px', borderBottom: `1px solid ${RD.line}` }}>
-        <div style={{ fontFamily: RD.display, fontSize: 36, fontStyle: 'italic', color: RD.ink }}>Splitdev</div>
+        <div style={{ fontFamily: RD.display, fontSize: 36, fontStyle: 'italic', color: RD.ink }}>Splitdev1</div>
         <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: RD.copper, marginTop: 6 }}>Writers Atelier</div>
       </header>
       <main style={{ padding: '32px 56px', display: 'flex', flexDirection: 'column', gap: 24 }}>
