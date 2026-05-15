@@ -1,5 +1,7 @@
 # SPLITDEV — The Writer's Atelier
 
+<img width="2034" height="1042" alt="Screenshot 2026-05-14 at 9 31 39 PM" src="https://github.com/user-attachments/assets/784ac6e5-0f20-4d99-8871-1ce109d85368" />
+
 Production port of the `SPLITDEV Redesign.html` prototype from the design handoff
 bundle (`SPLITDEV_.zip` → `redesign/*.jsx`).
 
