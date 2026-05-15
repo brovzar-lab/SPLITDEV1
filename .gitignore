@@ -6,3 +6,8 @@ dist-ssr
 .vite
 *.tsbuildinfo
 .claude/settings.local.json
+server/node_modules
+server/dist
+server/data/*.db
+server/data/*.db-journal
+server/.env
