@@ -5,8 +5,10 @@ import { REVISION_COLORS } from '../data/revisions';
 import type { CharacterBibleEntry } from '../api/types';
 import { SaveIndicator } from './Editor/SaveIndicator';
 import type { SaveStatus } from '../hooks/useAutosave';
+import { api } from '../api/client';
 
 interface TopBarProps {
+  screenplayId: string;
   revisionColor: string;
   setRevisionColor: (id: string) => void;
   viewMode: 'script' | 'cards';
@@ -23,6 +25,7 @@ interface TopBarProps {
 }
 
 export function TopBar({
+  screenplayId,
   revisionColor,
   setRevisionColor,
   viewMode,
@@ -36,6 +39,7 @@ export function TopBar({
   saveStatus,
 }: TopBarProps) {
   const [showRev, setShowRev] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const currentRev =
     REVISION_COLORS.find(r => r.id === revisionColor) || REVISION_COLORS[0];
 
@@ -320,6 +324,43 @@ export function TopBar({
           </div>
 
           <VoiceCast characters={characters} />
+
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setExportOpen(o => !o)}
+              style={{
+                padding: '5px 12px', fontSize: 10, fontWeight: 700,
+                letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer',
+                background: exportOpen ? RD.copper : 'rgba(244,237,224,0.08)',
+                color: exportOpen ? RD.paper : 'rgba(244,237,224,0.6)',
+                borderRadius: 3,
+              }}
+            >
+              Export ▾
+            </div>
+            {exportOpen && (
+              <div style={{
+                position: 'absolute', top: '110%', right: 0, marginTop: 6,
+                background: RD.card, border: `1px solid ${RD.line}`,
+                boxShadow: RD.shadowDeep, padding: 6, zIndex: 30, minWidth: 200,
+                fontFamily: RD.sans, borderRadius: 4,
+              }}>
+                {(['fountain', 'fdx'] as const).map(fmt => (
+                  <a
+                    key={fmt}
+                    href={api.exportUrl(screenplayId, fmt)}
+                    onClick={() => setExportOpen(false)}
+                    style={{
+                      display: 'block', padding: '6px 10px', cursor: 'pointer',
+                      color: RD.ink, fontSize: 11.5, textDecoration: 'none', borderRadius: 2,
+                    }}
+                  >
+                    {fmt === 'fountain' ? 'Fountain (.fountain)' : 'Final Draft (.fdx)'}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

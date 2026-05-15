@@ -202,6 +202,7 @@ export default function Editor() {
       }}
     >
       <TopBar
+        screenplayId={data.screenplay.id}
         revisionColor={revisionColor}
         setRevisionColor={setRevisionColor}
         viewMode={viewMode}
