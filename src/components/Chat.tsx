@@ -3,7 +3,7 @@ import { RD } from '../tokens';
 import { AGENTS } from '../data/agents';
 import { NOTE_ORIGINS } from '../data/notes';
 import { useChatStream } from '../hooks/useChatStream';
-import type { Note } from '../api/types';
+import type { Note, ChatMessage as ApiChatMessage } from '../api/types';
 import type {
   ChatMessage,
   ChatTarget,
@@ -25,6 +25,8 @@ interface Props {
   patternNotes: PatternNote[];
   characters: CharacterBibleEntry[];
   openBible: () => void;
+  initialHistory?: ApiChatMessage[];
+  greeting?: { text: string; done: boolean; error?: string } | null;
 }
 
 export function Chat({
@@ -39,6 +41,8 @@ export function Chat({
   patternNotes,
   characters,
   openBible,
+  initialHistory,
+  greeting,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
@@ -46,6 +50,8 @@ export function Chat({
   const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevNoteRef = useRef<string | null>(null);
+  const hydratedFor = useRef<string | null>(null);
+  const finalizedGreeting = useRef(false);
 
   const { reply, streaming, send: streamSend } = useChatStream();
 
@@ -84,6 +90,50 @@ export function Chat({
   useEffect(() => {
     setMessages([]);
   }, [target.kind, target.id]);
+
+  // Hydrate messages from server history on first load for this screenplay.
+  // Only runs once per screenplay (tracked by hydratedFor ref) and only when
+  // no note is active (history is for the script-level session, not note threads).
+  useEffect(() => {
+    if (!initialHistory || hydratedFor.current === screenplayId) return;
+    if (activeNote) return; // note threads are loaded separately
+    hydratedFor.current = screenplayId;
+    setMessages(
+      initialHistory.map(m => ({
+        role: m.role,
+        text: m.text,
+        respondent:
+          m.role === 'ai'
+            ? m.target_kind === 'agent'
+              ? `${m.target_id.charAt(0).toUpperCase() + m.target_id.slice(1)} Agent`
+              : m.target_id
+            : undefined,
+        respondentColor: undefined,
+        inCharacter: m.role === 'ai' && m.target_kind === 'character',
+        showApply: m.role === 'ai' && m.target_kind === 'agent',
+        voiceMatch: m.voice_match,
+      })),
+    );
+  }, [initialHistory, screenplayId, activeNote]);
+
+  // Append the completed greeting as a regular message once streaming finishes.
+  useEffect(() => {
+    if (greeting?.done && !greeting.error && !finalizedGreeting.current && greeting.text) {
+      finalizedGreeting.current = true;
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          text: greeting.text,
+          respondent: 'Session Opener',
+          respondentColor: RD.copper,
+          inCharacter: false,
+          showApply: false,
+          voiceMatch: null,
+        },
+      ]);
+    }
+  }, [greeting?.done, greeting?.text, greeting?.error]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -302,7 +352,7 @@ export function Chat({
           backgroundImage: RD.paperGrain,
         }}
       >
-        {!screenplayId && (
+        {!screenplayId && !greeting && (
           <div
             style={{
               textAlign: 'center',
@@ -747,6 +797,55 @@ export function Chat({
                 {reply.text || (
                   <span style={{ color: RD.inkFade, fontStyle: 'italic' }}>
                     {respondent} is writing…
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {greeting && !greeting.done && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontFamily: RD.display,
+                fontSize: 11,
+                fontStyle: 'italic',
+                color: RD.copper,
+                marginBottom: 3,
+                letterSpacing: 0.5,
+              }}
+            >
+              Session Opener
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 9,
+                  color: RD.inkFade,
+                  fontStyle: 'normal',
+                  fontFamily: RD.sans,
+                }}
+              >
+                streaming…
+              </span>
+            </div>
+            <div
+              style={{
+                padding: '10px 14px',
+                background: RD.card,
+                border: `1px solid ${RD.line}`,
+                borderLeft: `3px solid ${RD.copper}`,
+                borderRadius: 1,
+                lineHeight: 1.55,
+                fontSize: 13,
+                color: RD.ink,
+                fontFamily: RD.sans,
+              }}
+            >
+              <div style={{ whiteSpace: 'pre-wrap' }}>
+                {greeting.text || (
+                  <span style={{ color: RD.inkFade, fontStyle: 'italic' }}>
+                    Composing greeting…
                   </span>
                 )}
               </div>

@@ -11,6 +11,7 @@ import { History } from '../components/History';
 import { Divider } from '../components/Divider';
 import { useScreenplay } from '../hooks/useScreenplay';
 import { useAutosave, type SaveStatus } from '../hooks/useAutosave';
+import { useSessionOpener } from '../hooks/useSessionOpener';
 import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
 import type { ChatTarget } from '../types';
@@ -23,6 +24,7 @@ function getNoteScenes(note: { scenes?: string[] } | undefined): string[] {
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const { data, setData, loading, error } = useScreenplay(id);
+  const { greeting, history } = useSessionOpener(id ?? null);
 
   const [activeScene, setActiveScene] = useState<string>('');
   const [activeNote, setActiveNote] = useState('');
@@ -317,6 +319,8 @@ export default function Editor() {
               patternNotes={[]}
               characters={characterBible}
               openBible={() => setBibleOpen(true)}
+              initialHistory={history ?? undefined}
+              greeting={greeting}
             />
           </div>
         </div>
