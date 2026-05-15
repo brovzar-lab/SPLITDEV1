@@ -44,6 +44,18 @@ export const api = {
     request<{ note: Note }>(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteNote: (id: string) => request<void>(`/api/notes/${id}`, { method: 'DELETE' }),
 
+  ingestNotesText: (screenplayId: string, text: string) =>
+    request<{ notes: Note[] }>(`/api/screenplays/${screenplayId}/notes:ingest`, {
+      method: 'POST', body: JSON.stringify({ text }),
+    }),
+  ingestNotesFile: async (screenplayId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/api/screenplays/${screenplayId}/notes:ingest`, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{ notes: Note[] }>;
+  },
+
   exportUrl: (id: string, format: 'fountain' | 'fdx') =>
     `/api/screenplays/${id}/export?format=${format}`,
 

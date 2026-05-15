@@ -5,6 +5,7 @@ import { NOTE_ORIGINS } from '../data/notes';
 import type { Note } from '../api/types';
 import { api } from '../api/client';
 import type { NoteOriginId, NoteStatus, PatternNote } from '../types';
+import { IngestModal } from './Notes/IngestModal';
 
 interface Props {
   notes: Note[];
@@ -79,6 +80,7 @@ export function Notes({
   const [newBody, setNewBody] = useState('');
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [creating, setCreating] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
@@ -156,24 +158,42 @@ export function Notes({
           >
             Notes
           </div>
-          <button
-            onClick={() => setNewOpen(o => !o)}
-            style={{
-              padding: '4px 10px',
-              fontSize: 10,
-              fontFamily: RD.display,
-              fontWeight: 700,
-              letterSpacing: 1,
-              textTransform: 'uppercase',
-              background: RD.copper,
-              color: RD.paper,
-              border: 'none',
-              borderRadius: 2,
-              cursor: 'pointer',
-            }}
-          >
-            + New note
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setIngestOpen(true)}
+              style={{
+                padding: '4px 10px',
+                fontSize: 10,
+                fontFamily: RD.display,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                background: 'transparent',
+                color: RD.copper,
+                border: `1px solid ${RD.copper}50`,
+                borderRadius: 2,
+                cursor: 'pointer',
+              }}
+            >📋 Ingest notes</button>
+            <button
+              onClick={() => setNewOpen(o => !o)}
+              style={{
+                padding: '4px 10px',
+                fontSize: 10,
+                fontFamily: RD.display,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                background: RD.copper,
+                color: RD.paper,
+                border: 'none',
+                borderRadius: 2,
+                cursor: 'pointer',
+              }}
+            >
+              + New note
+            </button>
+          </div>
         </div>
 
         {newOpen && (
@@ -295,6 +315,17 @@ export function Notes({
           </div>
           <div style={{ fontSize: 11 }}>No notes yet for this screenplay</div>
         </div>
+
+        {ingestOpen && (
+          <IngestModal
+            screenplayId={screenplayId}
+            onClose={() => setIngestOpen(false)}
+            onIngested={(notes) => {
+              notes.forEach(n => onNoteCreated(n));
+              setIngestOpen(false);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -375,6 +406,22 @@ export function Notes({
                 Scene filtered ✕
               </span>
             )}
+            <button
+              onClick={() => setIngestOpen(true)}
+              style={{
+                padding: '4px 10px',
+                fontSize: 10,
+                fontFamily: RD.display,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                background: 'transparent',
+                color: RD.copper,
+                border: `1px solid ${RD.copper}50`,
+                borderRadius: 2,
+                cursor: 'pointer',
+              }}
+            >📋 Ingest notes</button>
             <button
               onClick={() => setNewOpen(o => !o)}
               style={{
@@ -1176,6 +1223,17 @@ export function Notes({
           </div>
         )}
       </div>
+
+      {ingestOpen && (
+        <IngestModal
+          screenplayId={screenplayId}
+          onClose={() => setIngestOpen(false)}
+          onIngested={(notes) => {
+            notes.forEach(n => onNoteCreated(n));
+            setIngestOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
