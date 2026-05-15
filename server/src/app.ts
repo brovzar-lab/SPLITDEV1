@@ -4,6 +4,7 @@ import screenplays from './routes/screenplays.js';
 import scenes from './routes/scenes.js';
 import lines from './routes/lines.js';
 import notes from './routes/notes.js';
+import exportRoute from './routes/exportRoute.js';
 import { openDb, type DB } from './db/index.js';
 import { env } from './env.js';
 
@@ -21,5 +22,6 @@ export function buildApp(deps: AppDeps = {}) {
   app.use('/api/scenes', scenes);
   app.use('/api/lines', lines);
   app.use('/api', notes);   // mounts /api/screenplays/:id/notes (POST) and /api/notes/:id (PATCH, DELETE)
+  app.use('/api', exportRoute);
   return app;
 }
