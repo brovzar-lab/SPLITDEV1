@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { buildApp } from '../../src/app.js';
 import { openDb, type DB } from '../../src/db/index.js';
@@ -7,6 +7,14 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'parsers', '__fixtures__');
+
+vi.mock('../../src/anthropic/client.js', () => ({
+  anthropicClient: () => ({
+    messages: {
+      create: async () => { throw new Error('mocked: no api key in tests'); },
+    },
+  }),
+}));
 
 describe('GET /api/screenplays', () => {
   let db: DB;
@@ -122,6 +130,25 @@ describe('DELETE /api/screenplays/:id', () => {
   it('returns 404 on missing id', async () => {
     const app = buildApp({ db: openDb(':memory:') });
     const res = await request(app).delete('/api/screenplays/missing');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/screenplays/:id/triage', () => {
+  it('triage status endpoint returns a valid status after upload', async () => {
+    const db = openDb(':memory:');
+    const app = buildApp({ db });
+    const fountain = readFileSync(join(fixtureDir, 'the-cabin.fountain'));
+    const up = await request(app).post('/api/screenplays').attach('file', fountain, 'the-cabin.fountain');
+    const id = up.body.screenplay.id;
+    const status = await request(app).get(`/api/screenplays/${id}/triage`);
+    expect(status.status).toBe(200);
+    expect(['pending', 'running', 'done', 'failed']).toContain(status.body.status);
+  });
+
+  it('triage status endpoint returns 404 for missing id', async () => {
+    const app = buildApp({ db: openDb(':memory:') });
+    const res = await request(app).get('/api/screenplays/missing/triage');
     expect(res.status).toBe(404);
   });
 });

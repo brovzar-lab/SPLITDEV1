@@ -10,6 +10,7 @@ import { parseFountain } from '../parsers/fountain.js';
 import { parseFdx } from '../parsers/fdx.js';
 import type { ParsedScreenplay } from '../parsers/types.js';
 import type { SourceFormat } from '../models/types.js';
+import { runTriageOnUpload } from '../triage/runner.js';
 
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 const r = Router();
@@ -35,7 +36,7 @@ r.post('/', upload.single('file'), (req, res) => {
     return res.status(400).json({ error: 'parse failed', code: 'parse_error', detail: (err as Error).message });
   }
 
-  const db = req.app.locals.db;
+  const db = req.app.locals.db as import('../db/index.js').DB;
   const screenplay = db.transaction(() => {
     const sp = createScreenplay(db, {
       title: parsed.title,
@@ -64,6 +65,12 @@ r.post('/', upload.single('file'), (req, res) => {
       updated_at: screenplay.updated_at,
     },
   });
+
+  setImmediate(() => {
+    runTriageOnUpload(db, screenplay.id).catch(err => {
+      console.error('Triage failed:', err);
+    });
+  });
 });
 
 r.get('/:id', (req, res) => {
@@ -78,6 +85,14 @@ r.get('/:id', (req, res) => {
     characterBible: listCharacterBible(db, sp.id),
     beats: listBeats(db, sp.id),
   });
+});
+
+r.get('/:id/triage', (req, res) => {
+  const db = req.app.locals.db;
+  const row = db.prepare('SELECT triage_status, triage_error FROM screenplay WHERE id = ?')
+    .get(req.params.id) as { triage_status: string; triage_error: string | null } | undefined;
+  if (!row) return res.status(404).json({ error: 'not found', code: 'not_found' });
+  res.json({ status: row.triage_status, error: row.triage_error });
 });
 
 r.patch('/:id', (req, res) => {
