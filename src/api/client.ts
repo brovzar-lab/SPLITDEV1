@@ -51,4 +51,7 @@ export const api = {
     const q = noteId ? `?noteId=${encodeURIComponent(noteId)}` : '';
     return request<{ messages: ChatMessage[] }>(`/api/screenplays/${screenplayId}/chat${q}`);
   },
+
+  getTriageStatus: (id: string) =>
+    request<{ status: 'pending' | 'running' | 'done' | 'failed'; error: string | null }>(`/api/screenplays/${id}/triage`),
 };
