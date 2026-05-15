@@ -17,6 +17,8 @@ interface Props {
   screenplayId: string;
   onNoteCreated: (note: Note) => void;
   onNoteDeleted: (id: string) => void;
+  triageStatus?: 'pending' | 'running' | 'done' | 'failed';
+  triageError?: string | null;
 }
 
 type Density = 'sticky' | 'list' | 'sheet';
@@ -70,6 +72,8 @@ export function Notes({
   screenplayId,
   onNoteCreated,
   onNoteDeleted,
+  triageStatus,
+  triageError,
 }: Props) {
   const [view, setView] = useState<View>('scene');
   const [showAll, setShowAll] = useState(false);
@@ -195,6 +199,24 @@ export function Notes({
             </button>
           </div>
         </div>
+
+        {triageStatus && triageStatus !== 'done' && (
+          <div style={{
+            padding: '8px 14px',
+            background: triageStatus === 'failed' ? RD.rubySoft : RD.copperSoft,
+            color: triageStatus === 'failed' ? RD.ruby : RD.copper,
+            fontFamily: RD.display,
+            fontStyle: 'italic',
+            fontSize: 12,
+            borderBottom: `1px solid ${triageStatus === 'failed' ? RD.ruby + '40' : RD.copper + '40'}`,
+          }}>
+            {triageStatus === 'pending' || triageStatus === 'running'
+              ? 'Reading your screenplay… AI is taking a closer look.'
+              : triageError
+              ? `AI triage couldn't run: ${triageError}`
+              : "AI triage couldn't run."}
+          </div>
+        )}
 
         {newOpen && (
           <div
@@ -529,6 +551,25 @@ export function Notes({
           </div>
         </div>
       </div>
+
+      {triageStatus && triageStatus !== 'done' && (
+        <div style={{
+          padding: '8px 14px',
+          background: triageStatus === 'failed' ? RD.rubySoft : RD.copperSoft,
+          color: triageStatus === 'failed' ? RD.ruby : RD.copper,
+          fontFamily: RD.display,
+          fontStyle: 'italic',
+          fontSize: 12,
+          borderBottom: `1px solid ${triageStatus === 'failed' ? RD.ruby + '40' : RD.copper + '40'}`,
+          flexShrink: 0,
+        }}>
+          {triageStatus === 'pending' || triageStatus === 'running'
+            ? 'Reading your screenplay… AI is taking a closer look.'
+            : triageError
+            ? `AI triage couldn't run: ${triageError}`
+            : "AI triage couldn't run."}
+        </div>
+      )}
 
       {newOpen && (
         <div

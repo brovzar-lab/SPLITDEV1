@@ -237,8 +237,7 @@ export function Chat({
       message: pendingMessage,
     }).catch(err => console.error('[chat stream pending]', err));
     onPendingConsumed?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMessage, screenplayId]);
+  }, [pendingMessage, screenplayId, streaming, target]);
 
   // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =

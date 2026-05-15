@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RD } from '../tokens';
 import { TopBar } from '../components/TopBar';
@@ -12,6 +12,7 @@ import { Divider } from '../components/Divider';
 import { useScreenplay } from '../hooks/useScreenplay';
 import { useAutosave, type SaveStatus } from '../hooks/useAutosave';
 import { useSessionOpener } from '../hooks/useSessionOpener';
+import { useTriageStatus } from '../hooks/useTriageStatus';
 import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
 import type { ChatTarget } from '../types';
@@ -25,6 +26,7 @@ export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const { data, setData, loading, error } = useScreenplay(id);
   const { greeting, history } = useSessionOpener(id ?? null);
+  const triage = useTriageStatus(id ?? null);
 
   const [activeScene, setActiveScene] = useState<string>('');
   const [activeNote, setActiveNote] = useState('');
@@ -80,6 +82,16 @@ export default function Editor() {
     [lineSave.status, sceneSave.status].includes('error') ? 'error' :
     [lineSave.status, sceneSave.status].includes('pending') ? 'pending' :
     [lineSave.status, sceneSave.status].includes('saved') ? 'saved' : 'idle';
+
+  const prevTriageStatus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    if (triage.status === 'done' && prevTriageStatus.current !== 'done') {
+      // Refetch screenplay to pull the new triage-generated notes
+      api.getScreenplay(id).then(d => setData(d)).catch(() => {});
+    }
+    prevTriageStatus.current = triage.status;
+  }, [triage.status, id]);
 
   const middleRef = useRef<HTMLDivElement>(null);
 
@@ -301,6 +313,8 @@ export default function Editor() {
               screenplayId={data.screenplay.id}
               onNoteCreated={handleNoteCreated}
               onNoteDeleted={handleNoteDeleted}
+              triageStatus={triage.status}
+              triageError={triage.error}
             />
           </div>
           <Divider
