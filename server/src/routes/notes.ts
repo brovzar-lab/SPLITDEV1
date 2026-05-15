@@ -8,6 +8,9 @@ import { anthropicClient } from '../anthropic/client.js';
 import { loadPromptFile } from '../anthropic/prompts.js';
 import { listScenes } from '../models/scene.js';
 import { env } from '../env.js';
+import { extractJsonObject } from '../anthropic/extractJson.js';
+
+const MAX_INGEST_CHARS = 50_000; // ~12k tokens — safe + bounded cost
 
 const r = Router();
 
@@ -69,8 +72,12 @@ r.post('/screenplays/:id/notes:ingest', upload.single('file'), async (req, res) 
   } catch (err) {
     return res.status(400).json({ error: (err as Error).message, code: 'extract_failed' });
   }
-  if (text.trim().length < 20) {
+  if (text.trim().length < 80) {
     return res.status(400).json({ error: 'too little content to ingest', code: 'too_short' });
+  }
+
+  if (text.length > MAX_INGEST_CHARS) {
+    text = text.slice(0, MAX_INGEST_CHARS) + '\n\n[... truncated; additional content omitted ...]';
   }
 
   const scenes = listScenes(db, screenplayId);
@@ -86,8 +93,7 @@ r.post('/screenplays/:id/notes:ingest', upload.single('file'), async (req, res) 
     });
     const block = result.content?.[0];
     const raw = block && block.type === 'text' ? block.text : '';
-    const cleaned = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-    extracted = Extracted.parse(JSON.parse(cleaned));
+    extracted = Extracted.parse(JSON.parse(extractJsonObject(raw)));
   } catch (err) {
     return res.status(500).json({ error: 'extraction failed', code: 'ai_extract_failed', detail: (err as Error).message });
   }

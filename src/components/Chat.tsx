@@ -3,6 +3,7 @@ import { RD } from '../tokens';
 import { AGENTS } from '../data/agents';
 import { NOTE_ORIGINS } from '../data/notes';
 import { useChatStream } from '../hooks/useChatStream';
+import { api } from '../api/client';
 import type { Note, ChatMessage as ApiChatMessage } from '../api/types';
 import type {
   ChatMessage,
@@ -43,7 +44,6 @@ export function Chat({
   patternNotes,
   characters,
   openBible,
-  initialHistory,
   greeting,
   pendingMessage,
   onPendingConsumed,
@@ -53,8 +53,7 @@ export function Chat({
   const [pinned, setPinned] = useState<PinnedMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const prevNoteRef = useRef<string | null>(null);
-  const hydratedFor = useRef<string | null>(null);
+  const hydratedKey = useRef<string | null>(null);
   const finalizedGreeting = useRef(false);
 
   const { reply, streaming, send: streamSend } = useChatStream();
@@ -84,26 +83,17 @@ export function Chat({
     inCharacter: !!character,
   });
 
+  // Re-key hydration on (screenplayId, activeNote) so toggling between
+  // note-scoped and script-level chat fetches the right history.
   useEffect(() => {
-    if (activeNote !== prevNoteRef.current) {
-      prevNoteRef.current = activeNote;
-      setMessages([]);
-    }
-  }, [activeNote]);
-
-  useEffect(() => {
-    setMessages([]);
-  }, [target.kind, target.id]);
-
-  // Hydrate messages from server history on first load for this screenplay.
-  // Only runs once per screenplay (tracked by hydratedFor ref) and only when
-  // no note is active (history is for the script-level session, not note threads).
-  useEffect(() => {
-    if (!initialHistory || hydratedFor.current === screenplayId) return;
-    if (activeNote) return; // note threads are loaded separately
-    hydratedFor.current = screenplayId;
-    setMessages(
-      initialHistory.map(m => ({
+    if (!screenplayId) return;
+    const key = `${screenplayId}|${activeNote || 'script'}`;
+    if (hydratedKey.current === key) return;
+    hydratedKey.current = key;
+    let cancelled = false;
+    api.getChatHistory(screenplayId, activeNote || null).then(({ messages: hist }) => {
+      if (cancelled) return;
+      setMessages(hist.map(m => ({
         role: m.role,
         text: m.text,
         respondent:
@@ -115,10 +105,13 @@ export function Chat({
         respondentColor: undefined,
         inCharacter: m.role === 'ai' && m.target_kind === 'character',
         showApply: m.role === 'ai' && m.target_kind === 'agent',
-        voiceMatch: m.voice_match,
-      })),
-    );
-  }, [initialHistory, screenplayId, activeNote]);
+        voiceMatch: m.voice_match ?? null,
+      })));
+    }).catch(() => {
+      if (!cancelled) setMessages([]);
+    });
+    return () => { cancelled = true; };
+  }, [screenplayId, activeNote]);
 
   // Append the completed greeting as a regular message once streaming finishes.
   useEffect(() => {
@@ -375,23 +368,6 @@ export function Chat({
           backgroundImage: RD.paperGrain,
         }}
       >
-        {!screenplayId && !greeting && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: RD.inkFade,
-              fontFamily: RD.display,
-              fontStyle: 'italic',
-            }}
-          >
-            <div style={{ fontSize: 40, opacity: 0.2, marginBottom: 10 }}>✒</div>
-            <div style={{ fontSize: 14 }}>
-              Select a note to begin correspondence
-            </div>
-          </div>
-        )}
-
         {showPinned && (
           <div
             style={{

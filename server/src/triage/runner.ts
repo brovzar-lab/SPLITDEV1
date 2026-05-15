@@ -7,6 +7,9 @@ import { listScenes } from '../models/scene.js';
 import { listLines } from '../models/line.js';
 import { insertNote } from '../models/note.js';
 import { env } from '../env.js';
+import { extractJsonObject } from '../anthropic/extractJson.js';
+
+const MAX_TRIAGE_CHARS = 200_000; // a ~300-page script max
 
 const TriageResponse = z.object({
   summary: z.string(),
@@ -37,7 +40,11 @@ export async function runTriageOnUpload(db: DB, screenplayId: string): Promise<v
       return `${s.heading}\n\n${sceneBody}`;
     }).join('\n\n---\n\n');
 
-    const prompt = loadPromptFile('triage/intake', { screenplay: screenplayText });
+    let truncatedText = screenplayText;
+    if (screenplayText.length > MAX_TRIAGE_CHARS) {
+      truncatedText = screenplayText.slice(0, MAX_TRIAGE_CHARS) + '\n\n[... truncated for triage ...]';
+    }
+    const prompt = loadPromptFile('triage/intake', { screenplay: truncatedText });
 
     const result = await anthropicClient().messages.create({
       model: env.MODEL,
@@ -47,8 +54,7 @@ export async function runTriageOnUpload(db: DB, screenplayId: string): Promise<v
 
     const block = result.content?.[0];
     const text = block && block.type === 'text' ? block.text : '';
-    const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-    const parsed = TriageResponse.parse(JSON.parse(cleaned));
+    const parsed = TriageResponse.parse(JSON.parse(extractJsonObject(text)));
 
     const sceneByHeading = new Map(scenes.map(s => [s.heading.toUpperCase(), s.id]));
 
