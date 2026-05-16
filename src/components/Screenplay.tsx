@@ -34,6 +34,7 @@ function renderInlineTags(text: string): ReactNode {
       parts.push(
         <span
           key={`agtag-${key++}`}
+          data-tag={m[1]}
           aria-hidden="true"
           style={{
             display: 'inline-block',
@@ -48,6 +49,37 @@ function renderInlineTags(text: string): ReactNode {
   }
   if (lastIndex < text.length) parts.push(text.slice(lastIndex));
   return parts;
+}
+
+// §2.1 — contentEditable round-trip serializer. The renderInlineTags above
+// turns `[[D]]` source text into a colored underline span with NO text
+// content. Calling `.textContent` on the contentEditable strips the tags
+// silently and on blur we'd persist the line without them. This walker
+// emits `[[X]]` for every `data-tag="X"` span and the textContent of every
+// other node, preserving the round-trip.
+export function serializeLineHtml(el: HTMLElement): string {
+  const out: string[] = [];
+  const walk = (node: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out.push(node.textContent ?? '');
+      return;
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const e = node as HTMLElement;
+      const tag = e.getAttribute('data-tag');
+      if (tag) {
+        out.push(`[[${tag}]]`);
+        return;
+      }
+      if (e.tagName === 'BR') {
+        out.push('\n');
+        return;
+      }
+    }
+    node.childNodes.forEach(walk);
+  };
+  el.childNodes.forEach(walk);
+  return out.join('');
 }
 
 // Smart agent surfacing — which 3 agents matter most for this line type.
@@ -345,7 +377,7 @@ export function Screenplay({
             style={{ fontWeight: 700, textTransform: 'uppercase', outline: 'none' }}
             contentEditable
             suppressContentEditableWarning
-            onBlur={e => onLineEdit?.(line.id, { character: e.currentTarget.textContent ?? '' })}
+            onBlur={e => onLineEdit?.(line.id, { character: serializeLineHtml(e.currentTarget) })}
           >
             {line.character}
           </div>
@@ -355,7 +387,7 @@ export function Screenplay({
               style={{ fontSize: 12, color: RD.inkSoft, outline: 'none' }}
               contentEditable
               suppressContentEditableWarning
-              onBlur={e => onLineEdit?.(line.id, { parenthetical: e.currentTarget.textContent ?? '' })}
+              onBlur={e => onLineEdit?.(line.id, { parenthetical: serializeLineHtml(e.currentTarget) })}
             >
               ({renderInlineTags(line.parenthetical)})
             </div>
@@ -365,7 +397,7 @@ export function Screenplay({
             style={{ outline: 'none' }}
             contentEditable
             suppressContentEditableWarning
-            onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
+            onBlur={e => onLineEdit?.(line.id, { text: serializeLineHtml(e.currentTarget) })}
           >
             {renderText(line.text)}
           </div>
@@ -386,7 +418,7 @@ export function Screenplay({
         }}
         contentEditable
         suppressContentEditableWarning
-        onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
+        onBlur={e => onLineEdit?.(line.id, { text: serializeLineHtml(e.currentTarget) })}
       >
         {renderText(line.text)}
       </div>,
@@ -554,7 +586,7 @@ export function Screenplay({
                     style={{ flex: 1, outline: 'none' }}
                     contentEditable
                     suppressContentEditableWarning
-                    onBlur={e => onSceneEdit?.(scene.id, { heading: e.currentTarget.textContent ?? '' })}
+                    onBlur={e => onSceneEdit?.(scene.id, { heading: serializeLineHtml(e.currentTarget) })}
                   >
                     {scene.heading}
                   </span>
