@@ -1,18 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RD } from '../tokens';
 import { AGENTS } from '../data/agents';
-import { CHARACTER_BIBLE } from '../data/characters';
 import { NOTE_ORIGINS } from '../data/notes';
-import { AI_RESPONSES, CHARACTER_LINES } from '../data/responses';
+import { useChatStream } from '../hooks/useChatStream';
+import { api } from '../api/client';
+import type { Note, ChatMessage as ApiChatMessage } from '../api/types';
 import type {
+  AgentReply,
   ChatMessage,
   ChatTarget,
-  Note,
+  NoteOriginId,
   PatternNote,
   PinnedMessage,
 } from '../types';
+import type { CharacterBibleEntry } from '../api/types';
+import { AgentStack } from './AgentStack';
 
 interface Props {
+  screenplayId: string;
+  noteId?: string | null;
   activeNote: string;
   activeAgent: string;
   setActiveAgent: (id: string) => void;
@@ -20,10 +26,28 @@ interface Props {
   setChatTarget: (t: ChatTarget) => void;
   notes: Note[];
   patternNotes: PatternNote[];
+  characters: CharacterBibleEntry[];
   openBible: () => void;
+  initialHistory?: ApiChatMessage[];
+  greeting?: { text: string; done: boolean; error?: string } | null;
+  pendingMessage?: string | null;
+  onPendingConsumed?: () => void;
+  // T2.2 — agent card state machine
+  activeSceneId: string;
+  agentReplies: AgentReply[];
+  onAgentReplyDone: (input: {
+    agentId: string;
+    sceneId: string;
+    prompt: string;
+    body: string;
+  }) => void;
+  onAgentReplyGraduate: (replyId: string) => void;
+  onAgentReplyStop?: () => void;
 }
 
 export function Chat({
+  screenplayId,
+  noteId,
   activeNote,
   activeAgent,
   setActiveAgent,
@@ -31,31 +55,40 @@ export function Chat({
   setChatTarget,
   notes,
   patternNotes,
+  characters,
   openBible,
+  greeting,
+  pendingMessage,
+  onPendingConsumed,
+  activeSceneId,
+  agentReplies,
+  onAgentReplyDone,
+  onAgentReplyGraduate,
+  onAgentReplyStop,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
-  const [typing, setTyping] = useState(false);
-  const [pinned, setPinned] = useState<PinnedMessage[]>([
-    {
-      id: 'p1',
-      text: 'Start mid-action: Sarah on a phone call, not arriving. Hook first.',
-      agent: 'Dialogue',
-      sceneId: 1,
-      color: '#c25e1c',
-    },
-    {
-      id: 'p2',
-      text: 'Sarah deflects with dry humor when scared—lean into that voice rule.',
-      agent: 'Character',
-      sceneId: 7,
-      color: '#3e6e3e',
-    },
-  ]);
+  const [pinned, setPinned] = useState<PinnedMessage[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const prevNoteRef = useRef<string | null>(null);
+  const hydratedKey = useRef<string | null>(null);
+  const finalizedGreeting = useRef(false);
 
+  // Snapshot taken at send() — what agent + scene + prompt this in-flight
+  // reply belongs to, so target switches mid-stream don't mis-stamp the
+  // finalized AgentReply.
+  const streamCtxRef = useRef<{
+    agentId: string;
+    sceneId: string;
+    prompt: string;
+  } | null>(null);
+  const [streamingAgentId, setStreamingAgentId] = useState<string | null>(null);
+  const [streamingPrompt, setStreamingPrompt] = useState('');
+  const finalizedReplyKey = useRef<string | null>(null);
+
+  const { reply, streaming, send: streamSend } = useChatStream();
+
+  // Combine api notes with legacy pattern notes for lookup
   const allNotes: Array<Note | PatternNote> = [...notes, ...patternNotes];
   const note = allNotes.find(n => n.id === activeNote);
   const target: ChatTarget = chatTarget || { kind: 'agent', id: activeAgent };
@@ -65,28 +98,113 @@ export function Chat({
     ) || AGENTS[1];
   const character =
     target.kind === 'character'
-      ? CHARACTER_BIBLE.find(c => c.id === target.id) || null
+      ? characters.find(c => c.id === target.id) || null
       : null;
 
-  useEffect(() => {
-    if (activeNote !== prevNoteRef.current) {
-      prevNoteRef.current = activeNote;
-      setMessages([]);
-    }
-  }, [activeNote]);
+  // Derived display values — must be above effects that reference them
+  const respondent = character ? character.name : `${agent.name} Agent`;
+  const respondentColor = character ? character.color : agent.color;
 
+  // Snapshot the respondent identity at send() time so target switches
+  // mid-stream don't mis-stamp the finalized AI message.
+  const streamRespondentRef = useRef<{ name: string; color: string; inCharacter: boolean }>({
+    name: respondent,
+    color: respondentColor,
+    inCharacter: !!character,
+  });
+
+  // Re-key hydration on (screenplayId, activeNote) so toggling between
+  // note-scoped and script-level chat fetches the right history.
   useEffect(() => {
-    setMessages([]);
-  }, [target.kind, target.id]);
+    if (!screenplayId) return;
+    const key = `${screenplayId}|${activeNote || 'script'}`;
+    if (hydratedKey.current === key) return;
+    hydratedKey.current = key;
+    let cancelled = false;
+    api.getChatHistory(screenplayId, activeNote || null).then(({ messages: hist }) => {
+      if (cancelled) return;
+      setMessages(hist.map(m => ({
+        role: m.role,
+        text: m.text,
+        respondent:
+          m.role === 'ai'
+            ? m.target_kind === 'agent'
+              ? `${m.target_id.charAt(0).toUpperCase() + m.target_id.slice(1)} Agent`
+              : m.target_id
+            : undefined,
+        respondentColor: undefined,
+        inCharacter: m.role === 'ai' && m.target_kind === 'character',
+        showApply: m.role === 'ai' && m.target_kind === 'agent',
+        voiceMatch: m.voice_match ?? null,
+      })));
+    }).catch(() => {
+      if (!cancelled) setMessages([]);
+    });
+    return () => { cancelled = true; };
+  }, [screenplayId, activeNote]);
+
+  // Append the completed greeting as a regular message once streaming finishes.
+  useEffect(() => {
+    if (greeting?.done && !greeting.error && !finalizedGreeting.current && greeting.text) {
+      finalizedGreeting.current = true;
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          text: greeting.text,
+          respondent: 'Session Opener',
+          respondentColor: RD.copper,
+          inCharacter: false,
+          showApply: false,
+          voiceMatch: null,
+        },
+      ]);
+    }
+  }, [greeting?.done, greeting?.text, greeting?.error]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, typing]);
+  }, [messages, streaming, reply.text]);
 
-  const respondent = character ? character.name : `${agent.name} Agent`;
-  const respondentColor = character ? character.color : agent.color;
+  // Finalize the streaming reply into the messages list when done.
+  // Read from the snapshot ref so the stamped identity is the one that was
+  // active when the user hit Send, not whatever the UI shows now. Also fire
+  // onAgentReplyDone for agent targets — Editor owns the gutter-pin lifecycle.
+  useEffect(() => {
+    if (!reply.done || !reply.text) return;
+    const replyKey = `${reply.text.length}|${reply.voiceMatch ?? ''}`;
+    if (finalizedReplyKey.current === replyKey) return;
+    finalizedReplyKey.current = replyKey;
+
+    const snap = streamRespondentRef.current;
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'ai',
+        text: reply.text,
+        respondent: snap.name,
+        respondentColor: snap.color,
+        inCharacter: snap.inCharacter,
+        showApply: !snap.inCharacter,
+        voiceMatch: reply.voiceMatch,
+      },
+    ]);
+
+    const agentCtx = streamCtxRef.current;
+    if (agentCtx && !snap.inCharacter) {
+      onAgentReplyDone({
+        agentId: agentCtx.agentId,
+        sceneId: agentCtx.sceneId,
+        prompt: agentCtx.prompt,
+        body: reply.text,
+      });
+    }
+    streamCtxRef.current = null;
+    setStreamingAgentId(null);
+    setStreamingPrompt('');
+  }, [reply.done, reply.text, reply.voiceMatch, onAgentReplyDone]);
 
   const previousThreads = note
     ? [
@@ -100,7 +218,7 @@ export function Chat({
         {
           id: 'pt2',
           date: '3 days ago',
-          summary: "Sarah's voice in Scene 7",
+          summary: "Character voice in opening scene",
           agent: 'Character',
           color: '#3e6e3e',
         },
@@ -108,14 +226,13 @@ export function Chat({
     : [];
 
   const pinMessage = (msg: ChatMessage) => {
-    const sceneId = note && 'sceneId' in note ? note.sceneId : null;
     setPinned(prev => [
       ...prev,
       {
         id: 'p' + Date.now(),
         text: msg.text,
         agent: (msg.respondent || '').replace(' Agent', ''),
-        sceneId,
+        sceneId: null,
         color: msg.respondentColor || RD.copper,
       },
     ]);
@@ -123,42 +240,99 @@ export function Chat({
   const unpinMessage = (id: string) =>
     setPinned(prev => prev.filter(p => p.id !== id));
 
-  const getReply = (): string => {
-    if (character) {
-      const pool = CHARACTER_LINES[character.id] || ['...'];
-      return pool[Math.floor(Math.random() * pool.length)];
-    }
-    const pool = AI_RESPONSES[target.id] || AI_RESPONSES['dialogue'];
-    return pool[Math.floor(Math.random() * pool.length)];
-  };
-
-  const send = () => {
+  const send = useCallback(() => {
     const text = inputVal.trim();
-    if (!text) return;
+    if (!text || !screenplayId) return;
+    // Snapshot target identity before the async stream begins so any
+    // mid-stream target switch doesn't corrupt the finalized message.
+    streamRespondentRef.current = {
+      name: respondent,
+      color: respondentColor,
+      inCharacter: !!character,
+    };
+    if (target.kind === 'agent') {
+      streamCtxRef.current = {
+        agentId: target.id,
+        sceneId: activeSceneId,
+        prompt: text,
+      };
+      setStreamingAgentId(target.id);
+      setStreamingPrompt(text);
+      finalizedReplyKey.current = null;
+    } else {
+      streamCtxRef.current = null;
+    }
     setMessages(prev => [...prev, { role: 'user', text }]);
     setInputVal('');
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'ai',
-          text: getReply(),
-          respondent,
-          respondentColor,
-          inCharacter: !!character,
-          showApply: !character && Math.random() > 0.4,
-          voiceMatch: !character ? 0.7 + Math.random() * 0.25 : null,
-        },
-      ]);
-    }, 800 + Math.random() * 1000);
-  };
+    streamSend({
+      screenplayId,
+      noteId: noteId ?? null,
+      target,
+      message: text,
+    }).catch(err => console.error('[chat stream]', err));
+  }, [inputVal, screenplayId, noteId, target, streamSend, respondent, respondentColor, character, activeSceneId]);
 
+  // One-shot trigger: when Editor passes a pendingMessage (e.g. from ★ Ask AI),
+  // auto-send it through the same pipeline as a manual send, then clear it.
+  useEffect(() => {
+    if (!pendingMessage || !screenplayId || streaming) return;
+    streamRespondentRef.current = {
+      name: respondent,
+      color: respondentColor,
+      inCharacter: !!character,
+    };
+    if (target.kind === 'agent') {
+      streamCtxRef.current = {
+        agentId: target.id,
+        sceneId: activeSceneId,
+        prompt: pendingMessage,
+      };
+      setStreamingAgentId(target.id);
+      setStreamingPrompt(pendingMessage);
+      finalizedReplyKey.current = null;
+    } else {
+      streamCtxRef.current = null;
+    }
+    setMessages(prev => [...prev, { role: 'user', text: pendingMessage }]);
+    streamSend({
+      screenplayId,
+      noteId: noteId ?? null,
+      target,
+      message: pendingMessage,
+    }).catch(err => console.error('[chat stream pending]', err));
+    onPendingConsumed?.();
+  }, [pendingMessage, screenplayId, streaming, target, activeSceneId]);
+
+  // Get origin for api Note (has .origin: NoteOriginId string)
   const noteOrigin =
     note && 'origin' in note
-      ? NOTE_ORIGINS[note.origin] || NOTE_ORIGINS.self
+      ? NOTE_ORIGINS[note.origin as NoteOriginId] || NOTE_ORIGINS.self
       : NOTE_ORIGINS.self;
+
+  // T2.2 — derive most-recent 'done' AgentReply per agent. Graduated replies
+  // live in the script gutter, not in the chat panel.
+  const repliesByAgent = (() => {
+    const map = new Map<string, AgentReply>();
+    for (const r of agentReplies) {
+      if (r.status !== 'done') continue;
+      const existing = map.get(r.agentId);
+      if (!existing || existing.createdAt < r.createdAt) {
+        map.set(r.agentId, r);
+      }
+    }
+    return map;
+  })();
+
+  const isAgentMode = target.kind === 'agent';
+
+  const handleAgentStop = useCallback(() => {
+    // useChatStream can't abort the fetch — we just stop attributing it.
+    // The eventual reply will arrive but won't create an AgentReply.
+    streamCtxRef.current = null;
+    setStreamingAgentId(null);
+    setStreamingPrompt('');
+    onAgentReplyStop?.();
+  }, [onAgentReplyStop]);
 
   return (
     <div
@@ -230,10 +404,10 @@ export function Chat({
               whiteSpace: 'nowrap',
             }}
           >
-            {typing
+            {streaming
               ? 'composing reply…'
               : character
-              ? `in character · ${character.role.toLowerCase()}`
+              ? `in character · ${(character.role || '').toLowerCase()}`
               : `${agent.desc.toLowerCase()}`}
           </div>
         </div>
@@ -290,23 +464,6 @@ export function Chat({
           backgroundImage: RD.paperGrain,
         }}
       >
-        {!note && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: RD.inkFade,
-              fontFamily: RD.display,
-              fontStyle: 'italic',
-            }}
-          >
-            <div style={{ fontSize: 40, opacity: 0.2, marginBottom: 10 }}>✒</div>
-            <div style={{ fontSize: 14 }}>
-              Select a note to begin correspondence
-            </div>
-          </div>
-        )}
-
         {showPinned && (
           <div
             style={{
@@ -379,7 +536,6 @@ export function Chat({
                       }}
                     >
                       {p.agent}
-                      {p.sceneId ? ` · Sc. ${p.sceneId}` : ''}
                     </div>
                     <div style={{ color: RD.ink, lineHeight: 1.45 }}>{p.text}</div>
                   </div>
@@ -400,7 +556,23 @@ export function Chat({
           </div>
         )}
 
-        {note && messages.length === 0 && previousThreads.length > 0 && (
+        {isAgentMode && (
+          <AgentStack
+            activeAgentId={activeAgent}
+            onPickAgent={id => {
+              setActiveAgent(id);
+              setChatTarget({ kind: 'agent', id });
+            }}
+            streamingAgentId={streamingAgentId}
+            streamingText={streaming ? reply.text : ''}
+            streamingPrompt={streamingPrompt}
+            repliesByAgent={repliesByAgent}
+            onStop={handleAgentStop}
+            onGraduate={onAgentReplyGraduate}
+          />
+        )}
+
+        {!isAgentMode && note && messages.length === 0 && previousThreads.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <div
               style={{
@@ -462,7 +634,7 @@ export function Chat({
           </div>
         )}
 
-        {note && messages.length === 0 && (
+        {!isAgentMode && note && messages.length === 0 && (
           <div
             style={{
               padding: '12px 16px 14px',
@@ -514,7 +686,7 @@ export function Chat({
           </div>
         )}
 
-        {messages.map((msg, i) => (
+        {!isAgentMode && messages.map((msg, i) => (
           <div key={i} style={{ marginBottom: 14 }}>
             <div
               style={{
@@ -672,16 +844,123 @@ export function Chat({
           </div>
         ))}
 
-        {typing && (
-          <div
-            style={{
-              fontSize: 11,
-              color: RD.inkFade,
-              fontStyle: 'italic',
-              fontFamily: RD.display,
-            }}
-          >
-            {respondent} is writing…
+        {!isAgentMode && streaming && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontFamily: RD.display,
+                fontSize: 11,
+                fontStyle: 'italic',
+                color: respondentColor,
+                marginBottom: 3,
+                letterSpacing: 0.5,
+              }}
+            >
+              {respondent}
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 9,
+                  color: RD.inkFade,
+                  fontStyle: 'normal',
+                  fontFamily: RD.sans,
+                }}
+              >
+                streaming…
+              </span>
+            </div>
+            <div
+              style={{
+                padding: character ? '14px 18px' : '10px 14px',
+                background: character ? '#fff' : RD.card,
+                border: `1px solid ${RD.line}`,
+                borderLeft: `3px solid ${respondentColor}`,
+                borderRadius: 1,
+                lineHeight: 1.55,
+                fontSize: 13,
+                color: RD.ink,
+                fontFamily: character ? RD.script : RD.sans,
+              }}
+            >
+              {character && (
+                <div
+                  style={{
+                    fontFamily: RD.script,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                    letterSpacing: 1.5,
+                    marginBottom: 6,
+                    color: RD.ink,
+                  }}
+                >
+                  {respondent.toUpperCase()}
+                </div>
+              )}
+              <div
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  textAlign: character ? 'center' : 'left',
+                  padding: character ? '0 30px' : 0,
+                }}
+              >
+                {reply.text || (
+                  <span style={{ color: RD.inkFade, fontStyle: 'italic' }}>
+                    {respondent} is writing…
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {greeting && !greeting.done && (
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontFamily: RD.display,
+                fontSize: 11,
+                fontStyle: 'italic',
+                color: RD.copper,
+                marginBottom: 3,
+                letterSpacing: 0.5,
+              }}
+            >
+              Session Opener
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 9,
+                  color: RD.inkFade,
+                  fontStyle: 'normal',
+                  fontFamily: RD.sans,
+                }}
+              >
+                streaming…
+              </span>
+            </div>
+            <div
+              style={{
+                padding: '10px 14px',
+                background: RD.card,
+                border: `1px solid ${RD.line}`,
+                borderLeft: `3px solid ${RD.copper}`,
+                borderRadius: 1,
+                lineHeight: 1.55,
+                fontSize: 13,
+                color: RD.ink,
+                fontFamily: RD.sans,
+              }}
+            >
+              <div style={{ whiteSpace: 'pre-wrap' }}>
+                {greeting.text || (
+                  <span style={{ color: RD.inkFade, fontStyle: 'italic' }}>
+                    Composing greeting…
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -743,15 +1022,17 @@ export function Chat({
                 </div>
               );
             })}
-            <div
-              style={{
-                width: 1,
-                background: RD.line,
-                margin: '0 4px',
-                flexShrink: 0,
-              }}
-            />
-            {CHARACTER_BIBLE.map(c => {
+            {characters.length > 0 && (
+              <div
+                style={{
+                  width: 1,
+                  background: RD.line,
+                  margin: '0 4px',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {characters.map(c => {
               const isActive =
                 target.kind === 'character' && target.id === c.id;
               return (
@@ -819,13 +1100,15 @@ export function Chat({
               }
             }}
             placeholder={
-              note
+              streaming
+                ? 'Waiting for reply…'
+                : note
                 ? character
                   ? `Speak to ${character.name}…`
                   : `Compose to ${agent.name}…`
-                : 'Select a note first…'
+                : 'Talk about your script…'
             }
-            disabled={!note}
+            disabled={streaming}
             rows={1}
             style={{
               flex: 1,
@@ -845,7 +1128,7 @@ export function Chat({
           />
           <button
             onClick={send}
-            disabled={!inputVal.trim() || !note}
+            disabled={!inputVal.trim() || streaming || !screenplayId}
             style={{
               padding: '10px 18px',
               fontFamily: RD.display,
@@ -853,11 +1136,11 @@ export function Chat({
               fontWeight: 700,
               letterSpacing: 1,
               textTransform: 'uppercase',
-              background: inputVal.trim() && note ? RD.copper : RD.lineDeep,
+              background: inputVal.trim() && !streaming && screenplayId ? RD.copper : RD.lineDeep,
               color: RD.paper,
               border: 'none',
               borderRadius: 1,
-              cursor: inputVal.trim() && note ? 'pointer' : 'default',
+              cursor: inputVal.trim() && !streaming && screenplayId ? 'pointer' : 'default',
             }}
           >
             Send ▸

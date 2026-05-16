@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<FinalDraft DocumentType="Script" Template="No" Version="5">
+  <Content>
+    <Paragraph Type="Scene Heading"><Text>INT. CABIN - DAY</Text></Paragraph>
+    <Paragraph Type="Action"><Text>The cabin is old and dusty. Sunlight filters through dirty windows.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Furniture covered in white sheets. A grandfather clock ticks in the corner.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>I told you, I'll be fine. It's just a weekend.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>She sets her bag down. Something CREAKS upstairs.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(into phone)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>Hold on—</Text></Paragraph>
+    <Paragraph Type="Action"><Text>She stares at the ceiling. The creaking stops.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sarah slowly lowers the phone. Listens. Nothing.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(into phone, forced casual)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>It's nothing. Old house noises.</Text></Paragraph>
+
+    <Paragraph Type="Scene Heading"><Text>EXT. WOODS - DAY</Text></Paragraph>
+    <Paragraph Type="Action"><Text>A narrow trail cuts through dense pines. Morning fog clings to the ground.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sarah walks the trail, earbuds in. She doesn't notice the FIGURE behind the trees.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(to herself)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>This was supposed to be relaxing...</Text></Paragraph>
+    <Paragraph Type="Action"><Text>She stops at a clearing. The woods are silent.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>A BRANCH snaps somewhere behind her. She spins around.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>Hello?</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Nothing. Just the trees. She exhales, walks faster.</Text></Paragraph>
+
+    <Paragraph Type="Scene Heading"><Text>INT. BASEMENT - NIGHT</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Concrete stairs descend into darkness. A bare bulb swings overhead, casting wild shadows.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sarah reaches the bottom step. Stops. Listens.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(whispered)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>Hello?</Text></Paragraph>
+    <Paragraph Type="Action"><Text>The bulb flickers. In the strobe, something MOVES in the far corner.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sarah fumbles for her phone flashlight. Hands shaking.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(to herself)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>Just the boiler. Just the boiler.</Text></Paragraph>
+
+    <Paragraph Type="Scene Heading"><Text>EXT. LAKE - DUSK</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Golden hour light on still water. The lake is glass-smooth, reflecting the treeline.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Sarah sits on the dock, feet dangling. A moment of peace.</Text></Paragraph>
+    <Paragraph Type="Action"><Text>Something BUMPS the underside of the dock. She pulls her feet up.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>SARAH</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>What the...</Text></Paragraph>
+    <Paragraph Type="Action"><Text>She peers over the edge. The water is dark, opaque. Another BUMP.</Text></Paragraph>
+  </Content>
+  <TitlePage>
+    <Content>
+      <Paragraph><Text>The Cabin</Text></Paragraph>
+      <Paragraph><Text>by Maya Reeves</Text></Paragraph>
+    </Content>
+  </TitlePage>
+</FinalDraft>

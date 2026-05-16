@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
-import { CHARACTER_BIBLE } from '../data/characters';
+import type { CharacterBibleEntry } from '../api/types';
+import { SaveIndicator } from './Editor/SaveIndicator';
+import type { SaveStatus } from '../hooks/useAutosave';
+import { api } from '../api/client';
 
 interface TopBarProps {
+  screenplayId: string;
   revisionColor: string;
   setRevisionColor: (id: string) => void;
   viewMode: 'script' | 'cards';
@@ -12,17 +17,29 @@ interface TopBarProps {
   setCharacterFilter: (c: string | null) => void;
   pageCount: number;
   totalPages: number;
+  title?: string;
+  author?: string | null;
+  sceneCount?: number;
+  characters: CharacterBibleEntry[];
+  saveStatus: SaveStatus;
 }
 
 export function TopBar({
+  screenplayId,
   revisionColor,
   setRevisionColor,
   viewMode,
   setViewMode,
   pageCount,
   totalPages,
+  title,
+  author,
+  sceneCount,
+  characters,
+  saveStatus,
 }: TopBarProps) {
   const [showRev, setShowRev] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const currentRev =
     REVISION_COLORS.find(r => r.id === revisionColor) || REVISION_COLORS[0];
 
@@ -49,7 +66,7 @@ export function TopBar({
         }}
       />
 
-      {/* Logo block */}
+      {/* Logo block with back link */}
       <div
         style={{
           padding: '12px 24px',
@@ -59,6 +76,31 @@ export function TopBar({
           borderRight: `1px solid rgba(244,237,224,0.15)`,
         }}
       >
+        {/* Back to Library */}
+        <Link
+          to="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '4px 8px',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+            color: 'rgba(244,237,224,0.5)',
+            textDecoration: 'none',
+            borderRadius: 2,
+            border: '1px solid rgba(244,237,224,0.15)',
+            transition: 'color 0.15s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = RD.copperSoft)}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(244,237,224,0.5)')}
+        >
+          ← Lib
+        </Link>
+
         <div>
           <div
             style={{
@@ -71,7 +113,7 @@ export function TopBar({
               fontStyle: 'italic',
             }}
           >
-            Splitdev
+            Splitdev1
           </div>
           <div
             style={{
@@ -114,7 +156,7 @@ export function TopBar({
               whiteSpace: 'nowrap',
             }}
           >
-            The Cabin
+            {title || 'Untitled'}
           </div>
           <div
             style={{
@@ -128,12 +170,16 @@ export function TopBar({
               whiteSpace: 'nowrap',
             }}
           >
-            <em style={{ fontFamily: RD.display, fontStyle: 'italic' }}>
-              a screenplay by
-            </em>{' '}
-            Maya Reeves
-            <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
-            42 scenes
+            {author && (
+              <>
+                <em style={{ fontFamily: RD.display, fontStyle: 'italic' }}>
+                  a screenplay by
+                </em>{' '}
+                {author}
+                <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
+              </>
+            )}
+            {sceneCount !== undefined && `${sceneCount} scene${sceneCount !== 1 ? 's' : ''}`}
           </div>
         </div>
 
@@ -239,6 +285,9 @@ export function TopBar({
             p. {pageCount} <span style={{ opacity: 0.4 }}>/ {totalPages}</span>
           </div>
 
+          {/* Save indicator */}
+          <SaveIndicator status={saveStatus} />
+
           {/* View ribbon */}
           <div
             style={{
@@ -274,7 +323,44 @@ export function TopBar({
             ))}
           </div>
 
-          <VoiceCast />
+          <VoiceCast characters={characters} />
+
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setExportOpen(o => !o)}
+              style={{
+                padding: '5px 12px', fontSize: 10, fontWeight: 700,
+                letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer',
+                background: exportOpen ? RD.copper : 'rgba(244,237,224,0.08)',
+                color: exportOpen ? RD.paper : 'rgba(244,237,224,0.6)',
+                borderRadius: 3,
+              }}
+            >
+              Export ▾
+            </div>
+            {exportOpen && (
+              <div style={{
+                position: 'absolute', top: '110%', right: 0, marginTop: 6,
+                background: RD.card, border: `1px solid ${RD.line}`,
+                boxShadow: RD.shadowDeep, padding: 6, zIndex: 30, minWidth: 200,
+                fontFamily: RD.sans, borderRadius: 4,
+              }}>
+                {(['fountain', 'fdx'] as const).map(fmt => (
+                  <a
+                    key={fmt}
+                    href={api.exportUrl(screenplayId, fmt)}
+                    onClick={() => setExportOpen(false)}
+                    style={{
+                      display: 'block', padding: '6px 10px', cursor: 'pointer',
+                      color: RD.ink, fontSize: 11.5, textDecoration: 'none', borderRadius: 2,
+                    }}
+                  >
+                    {fmt === 'fountain' ? 'Fountain (.fountain)' : 'Final Draft (.fdx)'}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -291,7 +377,7 @@ export function TopBar({
   );
 }
 
-function VoiceCast() {
+function VoiceCast({ characters }: { characters: CharacterBibleEntry[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: 'relative' }}>
@@ -355,75 +441,89 @@ function VoiceCast() {
           >
             Assign voices for read-aloud
           </div>
-          {CHARACTER_BIBLE.map(c => (
+          {characters.length === 0 ? (
             <div
-              key={c.id}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '7px 0',
-                borderBottom: `1px solid ${RD.line}`,
+                fontSize: 11,
+                color: RD.inkFade,
+                fontStyle: 'italic',
+                textAlign: 'center',
+                padding: '12px 0',
               }}
             >
+              No characters yet
+            </div>
+          ) : (
+            characters.map(c => (
               <div
+                key={c.id}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: c.color,
-                  color: '#fff',
-                  fontFamily: RD.display,
-                  fontSize: 14,
-                  fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: 10,
+                  padding: '7px 0',
+                  borderBottom: `1px solid ${RD.line}`,
                 }}
               >
-                {c.name[0]}
-              </div>
-              <div style={{ flex: 1 }}>
                 <div
                   style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: RD.ink,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: c.color,
+                    color: '#fff',
                     fontFamily: RD.display,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {c.name}
+                  {c.name[0]}
                 </div>
-                <div
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: RD.ink,
+                      fontFamily: RD.display,
+                    }}
+                  >
+                    {c.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: RD.inkFade,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {c.role}
+                  </div>
+                </div>
+                <select
                   style={{
-                    fontSize: 9,
-                    color: RD.inkFade,
-                    letterSpacing: 0.5,
+                    fontSize: 10,
+                    fontFamily: RD.sans,
+                    padding: '3px 6px',
+                    border: `1px solid ${RD.line}`,
+                    borderRadius: 3,
+                    background: RD.paper,
+                    color: RD.ink,
+                    cursor: 'pointer',
                   }}
                 >
-                  {c.role}
-                </div>
+                  <option>Aria</option>
+                  <option>Brian</option>
+                  <option>Maya</option>
+                  <option>Cole</option>
+                  <option>Whisper</option>
+                </select>
               </div>
-              <select
-                style={{
-                  fontSize: 10,
-                  fontFamily: RD.sans,
-                  padding: '3px 6px',
-                  border: `1px solid ${RD.line}`,
-                  borderRadius: 3,
-                  background: RD.paper,
-                  color: RD.ink,
-                  cursor: 'pointer',
-                }}
-              >
-                <option>Aria</option>
-                <option>Brian</option>
-                <option>Maya</option>
-                <option>Cole</option>
-                <option>Whisper</option>
-              </select>
-            </div>
-          ))}
+            ))
+          )}
           <button
             style={{
               width: '100%',

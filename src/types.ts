@@ -41,6 +41,7 @@ export interface Agent {
   name: string;
   color: string;
   desc: string;
+  glyph: string;
 }
 
 export interface NoteOrigin {
@@ -127,6 +128,30 @@ export interface UndoEntry {
 export type ChatTarget =
   | { kind: 'agent'; id: string }
   | { kind: 'character'; id: string };
+
+export type AgentCardState = 'rest' | 'composing' | 'streaming' | 'done';
+
+export type AgentReplyStatus = 'streaming' | 'done' | 'graduated';
+
+export interface AgentReply {
+  id: string;
+  agentId: string;
+  sceneId: string;
+  prompt: string;
+  body: string;
+  status: AgentReplyStatus;
+  createdAt: number;
+}
+
+export type LineActionGroup = 'ask' | 'rewrite' | 'capture' | 'utility';
+
+export interface LineMenuContext {
+  text: string;
+  lineId: string;
+  sceneId: string;
+  lineType: 'action' | 'dialogue';
+  character: string | null;
+}
 
 export interface ChatMessage {
   role: 'user' | 'ai';
