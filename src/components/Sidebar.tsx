@@ -1,6 +1,8 @@
-import { Fragment, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { RD } from '../tokens';
-import type { Scene, Line, Beat, Note } from '../api/types';
+import type { Scene, Line, Beat, Note, CharacterBibleEntry } from '../api/types';
+import { groupByLocation } from '../lib/groupByLocation';
+import { deriveCharacterScenes } from '../lib/deriveCharacterScenes';
 
 interface Props {
   activeScene: string;
@@ -8,22 +10,65 @@ interface Props {
   scenes: Array<Scene & { lines: Line[] }>;
   beats: Beat[];
   notes: Note[];
+  characters: CharacterBibleEntry[];
 }
 
-export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: Props) {
-  const [search, setSearch] = useState('');
+const MAX_BEADS = 3;
 
-  const sceneNoteCount: Record<string, number> = {};
-  scenes.forEach(s => (sceneNoteCount[s.id] = 0));
-  notes.forEach(n =>
-    (n.scenes || []).forEach(sid => {
-      sceneNoteCount[sid] = (sceneNoteCount[sid] || 0) + 1;
-    }),
+export function Sidebar({
+  activeScene,
+  setActiveScene,
+  scenes,
+  notes,
+  characters,
+}: Props) {
+  const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+
+  // Per-scene note counts.
+  const sceneNoteCount = useMemo(() => {
+    const c: Record<string, number> = {};
+    scenes.forEach(s => (c[s.id] = 0));
+    notes.forEach(n =>
+      (n.scenes || []).forEach(sid => {
+        c[sid] = (c[sid] || 0) + 1;
+      }),
+    );
+    return c;
+  }, [scenes, notes]);
+
+  // characterId → ordered scene IDs
+  const charScenes = useMemo(
+    () => deriveCharacterScenes(characters, scenes),
+    [characters, scenes],
   );
+
+  // sceneId → characters present (in name order to keep stable beads)
+  const sceneCharacters = useMemo(() => {
+    const m = new Map<string, CharacterBibleEntry[]>();
+    scenes.forEach(s => m.set(s.id, []));
+    characters.forEach(c => {
+      (charScenes.get(c.id) || []).forEach(sid => {
+        m.get(sid)?.push(c);
+      });
+    });
+    return m;
+  }, [scenes, characters, charScenes]);
 
   const filteredScenes = scenes.filter(s =>
     s.heading.toLowerCase().includes(search.toLowerCase()),
   );
+  const visibleIds = new Set(filteredScenes.map(s => s.id));
+
+  const groups = useMemo(() => groupByLocation(scenes), [scenes]);
+
+  const toggle = (base: string) =>
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(base)) next.delete(base);
+      else next.add(base);
+      return next;
+    });
 
   return (
     <div
@@ -70,160 +115,168 @@ export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: P
         </div>
       </div>
 
-      {/* Beats / Scenes */}
+      {/* Location-grouped tree */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 14px' }}>
-        {beats.length === 0 ? (
-          // Flat scene list when no beats defined
-          filteredScenes.map(s => {
-            const isActive = s.id === activeScene;
-            const noteCount = sceneNoteCount[s.id] || 0;
-            return (
+        {groups.map(g => {
+          const visibleScenes = g.scenes.filter(s => visibleIds.has(s.id));
+          if (visibleScenes.length === 0) return null;
+          const isCollapsed = collapsed.has(g.base);
+          return (
+            <div key={g.base} style={{ marginBottom: 2 }}>
+              {/* Location header */}
               <div
-                key={s.id}
-                onClick={() => setActiveScene(s.id)}
+                onClick={() => toggle(g.base)}
                 style={{
-                  padding: '5px 8px 5px 22px',
-                  cursor: 'pointer',
-                  fontSize: 11.5,
-                  color: isActive ? RD.copper : RD.inkSoft,
-                  fontWeight: isActive ? 600 : 400,
-                  background: isActive ? 'rgba(194,94,28,0.08)' : 'transparent',
-                  borderLeft: isActive ? `2px solid ${RD.copper}` : '2px solid transparent',
-                  marginLeft: 0,
+                  padding: '6px 16px 4px',
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
                 }}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', color: RD.inkFade, marginRight: 6 }}>
-                    {s.position}.
-                  </span>
-                  {s.heading.replace(/^(INT|EXT)\.\s+/, '')}
+                <span
+                  style={{
+                    fontFamily: RD.script,
+                    fontSize: 14,
+                    color: RD.copper,
+                    width: 12,
+                    lineHeight: 1,
+                  }}
+                >
+                  {isCollapsed ? '▸' : '▾'}
                 </span>
-                {noteCount > 0 && (
-                  <span style={{
-                    width: 16, height: 16, borderRadius: '50%', background: RD.gold, color: RD.ink,
-                    fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', marginLeft: 6, flexShrink: 0,
-                    boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.15)',
-                  }}>
-                    {noteCount}
-                  </span>
-                )}
+                <span
+                  style={{
+                    fontFamily: RD.display,
+                    fontStyle: 'italic',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: RD.ink,
+                    letterSpacing: 0.5,
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {g.base}
+                </span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: RD.inkFade,
+                    fontVariantNumeric: 'tabular-nums',
+                    border: `1px solid ${RD.line}`,
+                    padding: '0 6px',
+                    borderRadius: 1,
+                    fontFamily: RD.sans,
+                  }}
+                >
+                  {visibleScenes.length}
+                </span>
               </div>
-            );
-          })
-        ) : (
-        beats.map((beat, bi) => {
-          const beatScenes = filteredScenes.filter(s => beat.scenes.includes(s.id));
-          if (beatScenes.length === 0) return null;
 
-          const actLabel = bi < 2 ? 'I' : bi < 6 ? 'II' : 'III';
-          const prevAct = bi === 0 ? null : bi - 1 < 2 ? 'I' : bi - 1 < 6 ? 'II' : 'III';
-          const showActHeader = bi === 0 || prevAct !== actLabel;
-
-          return (
-            <Fragment key={beat.id}>
-              {showActHeader && (
-                <div
-                  style={{
-                    padding: '14px 18px 6px',
-                    borderBottom: `1px solid ${RD.line}`,
-                    margin: '4px 0 8px',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: RD.display,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: RD.copper,
-                      letterSpacing: 3,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Act {actLabel}
-                  </div>
-                </div>
-              )}
-              <div style={{ padding: '4px 18px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 6,
-                    marginBottom: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: RD.display,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: RD.inkFade,
-                      letterSpacing: 1,
-                      fontVariantNumeric: 'tabular-nums',
-                      width: 18,
-                    }}
-                  >
-                    {String(bi + 1).padStart(2, '0')}.
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: RD.display,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: RD.ink,
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    {beat.name}
-                  </span>
-                </div>
-                {beatScenes.map(s => {
+              {/* Scene slats */}
+              {!isCollapsed &&
+                visibleScenes.map(s => {
                   const isActive = s.id === activeScene;
                   const noteCount = sceneNoteCount[s.id] || 0;
+                  const present = sceneCharacters.get(s.id) || [];
+                  const beads = present.slice(0, MAX_BEADS);
+                  const overflow = Math.max(0, present.length - MAX_BEADS);
+                  const label = [s.sub, s.time].filter(Boolean).join(' · ');
                   return (
                     <div
                       key={s.id}
                       onClick={() => setActiveScene(s.id)}
                       style={{
-                        padding: '5px 8px 5px 22px',
+                        padding: '4px 16px 4px 36px',
                         cursor: 'pointer',
-                        fontSize: 11.5,
-                        color: isActive ? RD.copper : RD.inkSoft,
-                        fontWeight: isActive ? 600 : 400,
                         background: isActive
-                          ? 'rgba(194,94,28,0.08)'
+                          ? `${RD.copper}1c`
                           : 'transparent',
                         borderLeft: isActive
                           ? `2px solid ${RD.copper}`
                           : '2px solid transparent',
-                        marginLeft: -2,
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: 6,
                       }}
                     >
                       <span
                         style={{
+                          fontFamily: RD.script,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: isActive ? RD.copper : RD.inkFade,
+                          width: 22,
+                          fontVariantNumeric: 'tabular-nums',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s.position}
+                      </span>
+                      <span
+                        style={{
+                          flex: 1,
+                          fontFamily: RD.script,
+                          fontSize: 10.5,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.3,
+                          color: isActive ? RD.ink : RD.inkSoft,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                         }}
                       >
+                        {label || g.base}
+                      </span>
+                      {beads.length > 0 && (
                         <span
                           style={{
-                            fontVariantNumeric: 'tabular-nums',
-                            color: RD.inkFade,
-                            marginRight: 6,
+                            display: 'flex',
+                            gap: 2,
+                            alignItems: 'center',
+                            flexShrink: 0,
                           }}
                         >
-                          {s.position}.
+                          {beads.map(c => (
+                            <span
+                              key={c.id}
+                              title={c.name}
+                              style={{
+                                width: 14,
+                                height: 14,
+                                borderRadius: 1,
+                                background: c.color,
+                                color: '#fff',
+                                fontFamily: RD.display,
+                                fontSize: 8,
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
+                              }}
+                            >
+                              {c.name.charAt(0)}
+                            </span>
+                          ))}
+                          {overflow > 0 && (
+                            <span
+                              style={{
+                                fontFamily: RD.display,
+                                fontStyle: 'italic',
+                                fontSize: 9,
+                                color: RD.inkFade,
+                                marginLeft: 2,
+                              }}
+                            >
+                              +{overflow}
+                            </span>
+                          )}
                         </span>
-                        {s.heading.replace(/^(INT|EXT)\.\s+/, '')}
-                      </span>
+                      )}
                       {noteCount > 0 && (
                         <span
                           style={{
@@ -237,7 +290,6 @@ export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: P
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            marginLeft: 6,
                             flexShrink: 0,
                             boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.15)',
                           }}
@@ -248,11 +300,9 @@ export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: P
                     </div>
                   );
                 })}
-              </div>
-            </Fragment>
+            </div>
           );
-        })
-        )}
+        })}
       </div>
     </div>
   );
