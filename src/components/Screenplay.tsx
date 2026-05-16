@@ -4,7 +4,8 @@ import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
 import { AGENTS } from '../data/agents';
 import type { Scene, Line } from '../api/types';
-import type { LineMenuContext } from '../types';
+import type { AgentReply, LineMenuContext } from '../types';
+import { AgentMarginPin } from './AgentMarginPin';
 
 const TOKEN_TO_AGENT: Record<string, string> = {
   D: 'dialogue',
@@ -74,6 +75,8 @@ interface ScreenplayProps {
   author?: string;
   revisionTaggedLineIds?: ReadonlySet<string>;
   highlightLineId?: string | null;
+  graduatedReplies?: AgentReply[];
+  onBackToChat?: (replyId: string) => void;
 }
 
 const btnStyle = (bg: string, fg: string): CSSProperties => ({
@@ -118,6 +121,8 @@ export function Screenplay({
   author,
   revisionTaggedLineIds,
   highlightLineId,
+  graduatedReplies,
+  onBackToChat,
 }: ScreenplayProps) {
   const sceneRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const revColor =
@@ -409,6 +414,9 @@ export function Screenplay({
             const sceneStartPage = Math.floor(runningLines / linesPerPage) + 1;
             const sceneStartLineIdx = runningLines % linesPerPage;
             runningLines += scene.lines.length + 3;
+            const pinsHere = (graduatedReplies ?? []).filter(
+              r => r.sceneId === scene.id,
+            );
 
             const pageBreaksInScene: number[] = [];
             let lineCounter = sceneStartLineIdx + 3;
@@ -454,6 +462,29 @@ export function Screenplay({
                 >
                   p. {sceneStartPage}
                 </div>
+
+                {/* Agent reply pins (graduated chat replies anchored here) */}
+                {pinsHere.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: -42,
+                      top: 36,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {pinsHere.map(pin => (
+                      <AgentMarginPin
+                        key={pin.id}
+                        reply={pin}
+                        onBackToChat={() => onBackToChat?.(pin.id)}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 {/* Scene heading */}
                 <div
