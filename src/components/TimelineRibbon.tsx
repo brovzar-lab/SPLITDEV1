@@ -146,8 +146,12 @@ export function TimelineRibbon({
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
+        zIndex: 5,
         overflow: 'hidden',
         userSelect: 'none',
+        // Solid drop-shadow under the ribbon — pure cosmetic, but it also
+        // visually anchors the rail above the scrolling script.
+        boxShadow: '0 1px 0 rgba(26,22,18,0.4)',
       }}
     >
       {/* Row 1 — beat names (28px) */}
