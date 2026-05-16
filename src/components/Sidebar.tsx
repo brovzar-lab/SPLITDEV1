@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RD } from '../tokens';
 import type { Scene, Line, Beat, Note, CharacterBibleEntry } from '../api/types';
-import { groupByLocation } from '../lib/groupByLocation';
+import { groupByLocation, parseLocation } from '../lib/groupByLocation';
 import { deriveCharacterScenes } from '../lib/deriveCharacterScenes';
 
 interface Props {
@@ -24,6 +24,31 @@ export function Sidebar({
 }: Props) {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const sceneRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // T4.5 — when activeScene changes, expand its group (if collapsed) and
+  // scroll its row into view. Triggered by both timeline-ribbon clicks
+  // and Editor-driven scene switches.
+  useEffect(() => {
+    if (!activeScene) return;
+    const scene = scenes.find(s => s.id === activeScene);
+    if (!scene) return;
+    const targetBase = parseLocation(scene.heading).base.toUpperCase();
+    setCollapsed(prev => {
+      if (!prev.has(targetBase)) return prev;
+      const next = new Set(prev);
+      next.delete(targetBase);
+      return next;
+    });
+    // Defer so the DOM has time to expand the group before scrollIntoView.
+    const t = setTimeout(() => {
+      const el = sceneRowRefs.current.get(activeScene);
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 40);
+    return () => clearTimeout(t);
+  }, [activeScene, scenes]);
 
   // Per-scene note counts.
   const sceneNoteCount = useMemo(() => {
@@ -188,6 +213,10 @@ export function Sidebar({
                   return (
                     <div
                       key={s.id}
+                      ref={el => {
+                        if (el) sceneRowRefs.current.set(s.id, el);
+                        else sceneRowRefs.current.delete(s.id);
+                      }}
                       onClick={() => setActiveScene(s.id)}
                       style={{
                         padding: '4px 16px 4px 36px',
