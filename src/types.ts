@@ -98,6 +98,8 @@ export interface RevisionColor {
   border: string;
 }
 
+export type BeatKind = 'major' | 'minor';
+
 export interface Beat {
   id: string;
   name: string;

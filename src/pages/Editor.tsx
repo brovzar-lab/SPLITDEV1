@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { RD } from '../tokens';
 import { TopBar } from '../components/TopBar';
 import { Sidebar } from '../components/Sidebar';
+import { TimelineRibbon } from '../components/TimelineRibbon';
+import { OutlineDrawer } from '../components/OutlineDrawer';
 import { Screenplay } from '../components/Screenplay';
 import { Notes } from '../components/Notes';
 import { Chat } from '../components/Chat';
@@ -45,6 +47,13 @@ export default function Editor() {
   const [viewMode, setViewMode] = useState<'script' | 'cards'>('script');
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('splitdev.outline.open') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
   const [revisionTaggedLineIds, setRevisionTaggedLineIds] = useState<Set<string>>(
     () => new Set(),
@@ -72,6 +81,25 @@ export default function Editor() {
   useEffect(() => () => {
     graduateTimers.current.forEach(t => clearTimeout(t));
     graduateTimers.current.clear();
+  }, []);
+
+  // T3.1 — ⌘O / Ctrl+O toggles the outline drawer; persist across reloads.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isCmdO = (e.metaKey || e.ctrlKey) && (e.key === 'o' || e.key === 'O');
+      if (!isCmdO) return;
+      // Don't hijack browser "Open file" inside an input/contenteditable.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      setOutlineOpen(prev => {
+        const next = !prev;
+        try { localStorage.setItem('splitdev.outline.open', next ? '1' : '0'); } catch {}
+        return next;
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const handleAgentReplyDone = (input: {
@@ -456,15 +484,34 @@ export default function Editor() {
         saveStatus={saveStatus}
       />
 
+      <TimelineRibbon
+        scenes={scenes}
+        beats={beats}
+        notes={notes}
+        activeScene={effectiveActiveScene}
+        setActiveScene={setActiveScene}
+        currentPage={currentPage}
+      />
+
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <div style={{ width: sidebarW, flexShrink: 0, overflow: 'hidden' }}>
-          <Sidebar
-            activeScene={effectiveActiveScene}
-            setActiveScene={setActiveScene}
-            scenes={scenes}
-            beats={beats}
-            notes={notes}
-          />
+          {outlineOpen ? (
+            <OutlineDrawer
+              scenes={scenes}
+              beats={beats}
+              notes={notes}
+              activeScene={effectiveActiveScene}
+              setActiveScene={setActiveScene}
+            />
+          ) : (
+            <Sidebar
+              activeScene={effectiveActiveScene}
+              setActiveScene={setActiveScene}
+              scenes={scenes}
+              beats={beats}
+              notes={notes}
+            />
+          )}
         </div>
         <Divider
           direction="vertical"

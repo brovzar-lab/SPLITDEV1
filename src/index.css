@@ -37,3 +37,7 @@ button { font-family: inherit; }
 
 .rd-no-scrollbar { scrollbar-width: none; }
 .rd-no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media print {
+  .rd-timeline-ribbon { display: none !important; }
+}
