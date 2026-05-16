@@ -129,6 +129,16 @@ export type ChatTarget =
   | { kind: 'agent'; id: string }
   | { kind: 'character'; id: string };
 
+export type LineActionGroup = 'ask' | 'rewrite' | 'capture' | 'utility';
+
+export interface LineMenuContext {
+  text: string;
+  lineId: string;
+  sceneId: string;
+  lineType: 'action' | 'dialogue';
+  character: string | null;
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai';
   text: string;

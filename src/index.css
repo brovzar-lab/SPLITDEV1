@@ -7,6 +7,21 @@ body { background: #f4ede0; }
   50% { opacity: 0.4; }
 }
 
+@keyframes rd-slide-in-right {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes rd-highlight-pulse {
+  0%   { background: rgba(194,94,28,0.0); }
+  20%  { background: rgba(194,94,28,0.32); }
+  100% { background: rgba(194,94,28,0.0); }
+}
+
+.rd-line-highlight {
+  animation: rd-highlight-pulse 2000ms ease-out;
+}
+
 ::selection { background: rgba(194,94,28,0.25); color: #1a1612; }
 textarea::placeholder { color: #8a7e6a; font-style: italic; }
 input::placeholder { color: #8a7e6a; }
