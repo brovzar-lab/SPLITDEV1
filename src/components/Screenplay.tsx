@@ -602,31 +602,6 @@ export function Screenplay({
                       {scene.eighths} pgs
                     </span>
                   )}
-                  {onAskScene && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onAskScene(scene.id); }}
-                      style={{
-                        marginLeft: 8,
-                        padding: '2px 8px',
-                        fontFamily: RD.display,
-                        fontSize: 10,
-                        fontStyle: 'italic',
-                        color: RD.copper,
-                        background: 'transparent',
-                        border: `1px solid ${RD.copper}40`,
-                        borderRadius: 2,
-                        cursor: 'pointer',
-                        letterSpacing: 1,
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = RD.copperSoft;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >★ Ask AI</button>
-                  )}
                 </div>
 
                 {scene.lines.map((line, li) => (
