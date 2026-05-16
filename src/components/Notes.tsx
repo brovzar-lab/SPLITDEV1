@@ -152,26 +152,6 @@ export function Notes({
                 cursor: 'pointer',
               }}
             >📋 Ingest notes</button>
-            <button
-              onClick={() => setNewOpen(o => !o)}
-              style={{
-                padding: '6px 12px 7px',
-                background: RD.copper,
-                color: RD.paper,
-                fontFamily: RD.sans,
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                boxShadow:
-                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
-              }}
-            >
-              ＋ New note
-            </button>
           </div>
         </div>
 
@@ -421,26 +401,6 @@ export function Notes({
                 cursor: 'pointer',
               }}
             >📋 Ingest notes</button>
-            <button
-              onClick={() => setNewOpen(o => !o)}
-              style={{
-                padding: '6px 12px 7px',
-                background: RD.copper,
-                color: RD.paper,
-                fontFamily: RD.sans,
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                boxShadow:
-                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
-              }}
-            >
-              ＋ New note
-            </button>
           </div>
         </div>
 
