@@ -38,7 +38,7 @@ const rotations = [-0.6, 0.4, -0.3, 0.7, -0.5, 0.5];
 function StatusStamp({ status }: { status: NoteStatus }) {
   const map: Record<NoteStatus, { c: string; label: string }> = {
     discussing: { c: RD.copper, label: 'In discussion' },
-    unread: { c: RD.gold, label: 'Awaiting' },
+    unread: { c: RD.gold, label: 'Open' },
     applied: { c: RD.forest, label: 'Applied' },
   };
   const s = map[status] || map.unread;
