@@ -24,7 +24,6 @@ export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: P
   const filteredScenes = scenes.filter(s =>
     s.heading.toLowerCase().includes(search.toLowerCase()),
   );
-  const maxNoteCount = Math.max(...Object.values(sceneNoteCount), 1);
 
   return (
     <div
@@ -68,58 +67,6 @@ export function Sidebar({ activeScene, setActiveScene, scenes, beats, notes }: P
               fontFamily: RD.sans,
             }}
           />
-        </div>
-      </div>
-
-      {/* Heat map */}
-      <div style={{ padding: '0 18px 12px' }}>
-        <div
-          style={{
-            fontFamily: RD.display,
-            fontSize: 11,
-            fontWeight: 600,
-            color: RD.inkFade,
-            fontStyle: 'italic',
-            marginBottom: 4,
-            letterSpacing: 0.5,
-          }}
-        >
-          Notes per scene
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 2,
-            height: 28,
-            alignItems: 'flex-end',
-            padding: '2px 4px',
-            background: RD.ink,
-            borderRadius: 2,
-          }}
-        >
-          {scenes.map(s => {
-            const cnt = sceneNoteCount[s.id] || 0;
-            const h = cnt === 0 ? 4 : 4 + (cnt / maxNoteCount) * 20;
-            const isActive = s.id === activeScene;
-            return (
-              <div
-                key={s.id}
-                onClick={() => setActiveScene(s.id)}
-                title={`Scene ${s.position}: ${cnt} note${cnt !== 1 ? 's' : ''}`}
-                style={{
-                  flex: 1,
-                  height: h,
-                  cursor: 'pointer',
-                  background: isActive
-                    ? RD.copper
-                    : cnt > 0
-                    ? RD.gold
-                    : 'rgba(244,237,224,0.25)',
-                  borderRadius: 1,
-                }}
-              />
-            );
-          })}
         </div>
       </div>
 
