@@ -4,6 +4,7 @@ import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
 import { AGENTS } from '../data/agents';
 import type { Scene, Line } from '../api/types';
+import type { LineMenuContext } from '../types';
 
 const TOKEN_TO_AGENT: Record<string, string> = {
   D: 'dialogue',
@@ -47,11 +48,14 @@ function renderInlineTags(text: string): ReactNode {
   return parts;
 }
 
-const MORE_AGENTS_STORAGE_KEY = 'splitdev.contextmenu.moreAgents';
-const PRIMARY_AGENT_IDS = ['dialogue', 'structure', 'character'];
-const MORE_AGENT_IDS = ['horror', 'conflict', 'theme'];
+// Smart agent surfacing — which 3 agents matter most for this line type.
+// Brief T2.1: dialogue → Dialogue/Character/Structure; action → Structure/Horror/Conflict.
+const PRIMARY_BY_TYPE: Record<'action' | 'dialogue', string[]> = {
+  dialogue: ['dialogue', 'character', 'structure'],
+  action: ['structure', 'horror', 'conflict'],
+};
 
-type LineMenuState = { x: number; y: number; text: string } | null;
+type LineMenuState = { x: number; y: number; ctx: LineMenuContext } | null;
 
 type ApiScene = Scene & { lines: Line[] };
 
@@ -62,12 +66,14 @@ interface ScreenplayProps {
   viewMode: 'script' | 'cards';
   characterFilter: string | null;
   revisionColor: string;
-  onLineAction?: (action: string, text: string) => void;
+  onLineAction?: (action: string, ctx: LineMenuContext) => void;
   onLineEdit?: (id: string, patch: Partial<Line>) => void;
   onSceneEdit?: (id: string, patch: Partial<Scene>) => void;
   onAskScene?: (sceneId: string) => void;
   title?: string;
   author?: string;
+  revisionTaggedLineIds?: ReadonlySet<string>;
+  highlightLineId?: string | null;
 }
 
 const btnStyle = (bg: string, fg: string): CSSProperties => ({
@@ -110,6 +116,8 @@ export function Screenplay({
   onAskScene,
   title,
   author,
+  revisionTaggedLineIds,
+  highlightLineId,
 }: ScreenplayProps) {
   const sceneRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const revColor =
@@ -136,6 +144,53 @@ export function Screenplay({
     return () => document.removeEventListener('click', close);
   }, [lineMenu]);
 
+  // Keyboard shortcuts — fire when there's an active selection inside a
+  // line. Brief T2.1: ⌘D ⌘⇧C ⌘⇧S ⌘R ⌘⇧R ⌘F ⌘N ⌘T ⌘V ⌘L ⌘⌫.
+  useEffect(() => {
+    if (!onLineAction) return;
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.anchorNode) return;
+      const anchorEl =
+        sel.anchorNode.nodeType === Node.TEXT_NODE
+          ? sel.anchorNode.parentElement
+          : (sel.anchorNode as Element);
+      const lineEl = anchorEl?.closest('[data-line-id]') as HTMLElement | null;
+      if (!lineEl) return;
+      const lineId = lineEl.dataset.lineId!;
+      const sceneId = lineEl.dataset.sceneId!;
+      const lineType = (lineEl.dataset.lineType as 'action' | 'dialogue') || 'action';
+      const character = lineEl.dataset.lineCharacter || null;
+      const ctx: LineMenuContext = {
+        text: sel.toString(),
+        lineId,
+        sceneId,
+        lineType,
+        character,
+      };
+      const key = e.key.toLowerCase();
+      let action: string | null = null;
+      if (key === 'd' && !e.shiftKey) action = 'ask-dialogue';
+      else if (key === 's' && e.shiftKey) action = 'ask-structure';
+      else if (key === 'c' && e.shiftKey) action = 'ask-character';
+      else if (key === 'r' && e.shiftKey) action = 'compress-expand';
+      else if (key === 'r' && !e.shiftKey) action = 'rewrite';
+      else if (key === 'f' && !e.shiftKey) action = 'find-similar';
+      else if (key === 'n' && !e.shiftKey) action = 'note-this';
+      else if (key === 't' && !e.shiftKey) action = 'tag-for-revision';
+      else if (key === 'v' && !e.shiftKey) action = 'voice-exemplar';
+      else if (key === 'l' && !e.shiftKey) action = 'read';
+      else if (key === 'backspace') action = 'cut';
+      if (!action) return;
+      e.preventDefault();
+      onLineAction(action, ctx);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onLineAction]);
+
   if (viewMode === 'cards') {
     return (
       <IndexCardsView
@@ -149,18 +204,39 @@ export function Screenplay({
   const linesPerPage = 55;
   let runningLines = 0;
 
-  const openLineMenu = (e: React.MouseEvent, line: Line) => {
+  const openLineMenu = (e: React.MouseEvent, line: Line, sceneId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const text = line.type === 'action' ? line.text : (line.text || '');
-    setLineMenu({ x: e.clientX, y: e.clientY, text });
+    setLineMenu({
+      x: e.clientX,
+      y: e.clientY,
+      ctx: {
+        text: line.text || '',
+        lineId: line.id,
+        sceneId,
+        lineType: line.type,
+        character: line.character,
+      },
+    });
   };
 
-  const renderLine = (line: Line, key: string) => {
+  const renderLine = (line: Line, key: string, sceneId: string) => {
+    const isTagged = revisionTaggedLineIds?.has(line.id);
+    const isHighlight = highlightLineId === line.id;
+    const lineDataAttrs = {
+      'data-line-id': line.id,
+      'data-scene-id': sceneId,
+      'data-line-type': line.type,
+      ...(line.type === 'dialogue' && line.character
+        ? { 'data-line-character': line.character }
+        : {}),
+    } as Record<string, string>;
+
     const wrap = (content: React.ReactNode) => (
       <div
         key={key}
-        onContextMenu={e => openLineMenu(e, line)}
+        onContextMenu={e => openLineMenu(e, line, sceneId)}
+        className={`rd-line${isHighlight ? ' rd-line-highlight' : ''}`}
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 22px',
@@ -168,20 +244,22 @@ export function Screenplay({
           gap: 0,
           position: 'relative',
         }}
-        className="rd-line"
       >
         <div style={{ minWidth: 0 }}>{content}</div>
         <div
           style={{
             fontFamily: RD.script,
             fontSize: 13,
-            color: RD.ruby,
+            color: isTagged ? revColor.border : RD.ruby,
             fontWeight: 700,
             textAlign: 'right',
             lineHeight: 1.8,
             paddingTop: 3,
           }}
-        />
+          aria-hidden="true"
+        >
+          {isTagged ? '*' : ''}
+        </div>
       </div>
     );
 
@@ -197,6 +275,7 @@ export function Screenplay({
           }}
         >
           <div
+            {...lineDataAttrs}
             style={{ fontWeight: 700, textTransform: 'uppercase', outline: 'none' }}
             contentEditable
             suppressContentEditableWarning
@@ -206,6 +285,7 @@ export function Screenplay({
           </div>
           {line.parenthetical && (
             <div
+              {...lineDataAttrs}
               style={{ fontSize: 12, color: RD.inkSoft, outline: 'none' }}
               contentEditable
               suppressContentEditableWarning
@@ -215,6 +295,7 @@ export function Screenplay({
             </div>
           )}
           <div
+            {...lineDataAttrs}
             style={{ outline: 'none' }}
             contentEditable
             suppressContentEditableWarning
@@ -228,6 +309,7 @@ export function Screenplay({
 
     return wrap(
       <div
+        {...lineDataAttrs}
         style={{
           fontFamily: RD.script,
           fontSize: 13,
@@ -457,7 +539,7 @@ export function Screenplay({
 
                 {scene.lines.map((line, li) => (
                   <Fragment key={`${si}-${li}`}>
-                    {renderLine(line, `${si}-${li}`)}
+                    {renderLine(line, `${si}-${li}`, scene.id)}
                     {pageBreaksInScene.includes(li) && (
                       <PageBreak
                         pageNum={
@@ -529,84 +611,21 @@ function PageBreak({ pageNum }: { pageNum: number }) {
 
 interface LineContextMenuProps {
   menu: NonNullable<LineMenuState>;
-  onAction?: (action: string, text: string) => void;
+  onAction?: (action: string, ctx: LineMenuContext) => void;
 }
 
 function LineContextMenu({ menu, onAction }: LineContextMenuProps) {
-  const [showMore, setShowMore] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem(MORE_AGENTS_STORAGE_KEY);
-      return raw ? Boolean(JSON.parse(raw)) : false;
-    } catch {
-      return false;
-    }
-  });
+  // Per-session disclosure, no localStorage (brief T2.1).
+  const [showMore, setShowMore] = useState(false);
 
-  const toggleMore = () => {
-    setShowMore(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem(MORE_AGENTS_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable — preference stays in-memory */
-      }
-      return next;
-    });
-  };
+  const { ctx } = menu;
+  const primaryIds = PRIMARY_BY_TYPE[ctx.lineType] ?? ['dialogue', 'structure', 'character'];
+  const primaryAgents = primaryIds
+    .map(id => AGENTS.find(a => a.id === id))
+    .filter((a): a is (typeof AGENTS)[number] => Boolean(a));
+  const moreAgents = AGENTS.filter(a => !primaryIds.includes(a.id));
 
-  const primaryAgents = PRIMARY_AGENT_IDS.map(id =>
-    AGENTS.find(a => a.id === id),
-  ).filter((a): a is (typeof AGENTS)[number] => Boolean(a));
-  const moreAgents = MORE_AGENT_IDS.map(id =>
-    AGENTS.find(a => a.id === id),
-  ).filter((a): a is (typeof AGENTS)[number] => Boolean(a));
-
-  const rowStyle: CSSProperties = {
-    padding: '6px 10px',
-    cursor: 'pointer',
-    fontSize: 11.5,
-    color: RD.ink,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 9,
-    borderRadius: 2,
-  };
-
-  const renderAgentRow = (a: (typeof AGENTS)[number]) => (
-    <div
-      key={a.id}
-      onClick={() => onAction && onAction(`ask-${a.id}`, menu.text)}
-      style={rowStyle}
-      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-    >
-      <span style={{ color: a.color, width: 14, textAlign: 'center', fontWeight: 700 }}>
-        {a.glyph}
-      </span>
-      <span style={{ color: RD.inkFade }}>→</span>
-      <span>{a.name}</span>
-    </div>
-  );
-
-  const renderActionRow = (label: string, icon: string, action: string) => (
-    <div
-      key={action}
-      onClick={() => onAction && onAction(action, menu.text)}
-      style={rowStyle}
-      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-    >
-      <span style={{ color: RD.copper, width: 14, textAlign: 'center' }}>{icon}</span>
-      {label}
-    </div>
-  );
-
-  const divider = (key: string) => (
-    <div
-      key={key}
-      style={{ height: 1, background: RD.line, margin: '3px 6px' }}
-    />
-  );
+  const fire = (action: string) => () => onAction?.(action, ctx);
 
   return (
     <div
@@ -619,47 +638,213 @@ function LineContextMenu({ menu, onAction }: LineContextMenuProps) {
         border: `1px solid ${RD.lineDeep}`,
         boxShadow: '0 12px 32px rgba(40,28,16,0.18)',
         borderRadius: 2,
-        padding: 4,
-        minWidth: 220,
+        padding: '4px 0',
+        minWidth: 260,
         fontFamily: RD.sans,
       }}
+      onClick={e => e.stopPropagation()}
     >
+      {/* Selection preview */}
       <div
         style={{
-          padding: '6px 10px 4px',
-          fontSize: 9,
+          padding: '8px 12px 6px',
+          fontSize: 10,
           color: RD.inkFade,
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
+          letterSpacing: 1.2,
           fontStyle: 'italic',
-          fontFamily: RD.display,
+          fontFamily: RD.script,
           borderBottom: `1px solid ${RD.line}`,
-          marginBottom: 3,
+          marginBottom: 4,
+          maxWidth: 320,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
-        "{(menu.text || '').slice(0, 38)}…"
+        "{(ctx.text || '').slice(0, 50)}{(ctx.text || '').length > 50 ? '…' : ''}"
       </div>
-      {primaryAgents.map(renderAgentRow)}
-      {showMore && moreAgents.map(renderAgentRow)}
-      <div
-        onClick={toggleMore}
-        style={{
-          ...rowStyle,
-          fontStyle: 'italic',
-          color: RD.inkFade,
-          fontSize: 10.5,
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-      >
-        <span style={{ width: 14, textAlign: 'center' }}>{showMore ? '−' : '+'}</span>
-        {showMore ? 'Fewer agents' : 'More agents'}
-      </div>
-      {divider('d1')}
-      {renderActionRow('Rewrite this line', '✎', 'rewrite')}
-      {renderActionRow('Cut from script', '✂', 'cut')}
-      {divider('d2')}
-      {renderActionRow('Read aloud', '♪', 'read')}
+
+      <SectionLabel>Ask</SectionLabel>
+      {primaryAgents.map(a => (
+        <AgentRow key={a.id} agent={a} shortcut={shortcutForAgent(a.id)} onClick={fire(`ask-${a.id}`)} />
+      ))}
+      {showMore && moreAgents.map(a => (
+        <AgentRow key={a.id} agent={a} shortcut={null} onClick={fire(`ask-${a.id}`)} />
+      ))}
+      <DisclosureRow open={showMore} onClick={() => setShowMore(v => !v)} />
+
+      <SectionLabel>Rewrite</SectionLabel>
+      <ActionRow glyph="✎" label="Rewrite this line" shortcut="⌘R" onClick={fire('rewrite')} />
+      <ActionRow glyph="↔" label="Compress / Expand" shortcut="⌘⇧R" onClick={fire('compress-expand')} />
+      <ActionRow glyph="≋" label="Find similar" shortcut="⌘F" onClick={fire('find-similar')} />
+
+      <SectionLabel>Capture</SectionLabel>
+      <ActionRow glyph="▤" label="Note this" shortcut="⌘N" onClick={fire('note-this')} />
+      <ActionRow glyph="★" label="Tag for revision" shortcut="⌘T" onClick={fire('tag-for-revision')} />
+      <ActionRow
+        glyph="👤"
+        label="Voice exemplar →"
+        shortcut="⌘V"
+        onClick={fire('voice-exemplar')}
+        disabled={ctx.lineType !== 'dialogue'}
+      />
+
+      <SectionLabel>Utilities</SectionLabel>
+      <ActionRow glyph="♪" label="Read aloud" shortcut="⌘L" onClick={fire('read')} />
+      <ActionRow
+        glyph="✂"
+        label="Cut from script"
+        shortcut="⌘⌫"
+        onClick={fire('cut')}
+        destructive
+      />
+    </div>
+  );
+}
+
+function shortcutForAgent(id: string): string | null {
+  if (id === 'dialogue') return '⌘D';
+  if (id === 'structure') return '⌘⇧S';
+  if (id === 'character') return '⌘⇧C';
+  return null;
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: '8px 12px 4px',
+        fontFamily: RD.display,
+        fontStyle: 'italic',
+        fontSize: 9.5,
+        fontWeight: 700,
+        color: RD.inkFade,
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        borderBottom: `1px solid ${RD.line}`,
+        margin: '2px 8px 4px',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const rowBaseStyle: CSSProperties = {
+  padding: '5px 12px',
+  cursor: 'pointer',
+  fontSize: 13,
+  color: RD.ink,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  borderRadius: 2,
+  margin: '0 4px',
+  fontFamily: RD.sans,
+};
+
+function AgentRow({
+  agent,
+  shortcut,
+  onClick,
+}: {
+  agent: (typeof AGENTS)[number];
+  shortcut: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={rowBaseStyle}
+      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ color: agent.color, width: 14, textAlign: 'center', fontWeight: 700 }}>
+        {agent.glyph}
+      </span>
+      <span style={{ color: RD.inkFade }}>→</span>
+      <span style={{ flex: 1 }}>{agent.name}</span>
+      {shortcut && (
+        <span
+          style={{
+            fontFamily: RD.script,
+            fontSize: 10.5,
+            color: RD.inkFade,
+            letterSpacing: 0.5,
+          }}
+        >
+          {shortcut}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ActionRow({
+  glyph,
+  label,
+  shortcut,
+  onClick,
+  destructive,
+  disabled,
+}: {
+  glyph: string;
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+}) {
+  const hoverBg = destructive ? `${RD.ruby}1f` : RD.copperSoft;
+  return (
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{
+        ...rowBaseStyle,
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+      onMouseEnter={e => {
+        if (!disabled) e.currentTarget.style.background = hoverBg;
+      }}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ color: destructive ? RD.ruby : RD.copper, width: 14, textAlign: 'center' }}>
+        {glyph}
+      </span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {shortcut && (
+        <span
+          style={{
+            fontFamily: RD.script,
+            fontSize: 10.5,
+            color: RD.inkFade,
+            letterSpacing: 0.5,
+          }}
+        >
+          {shortcut}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DisclosureRow({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        ...rowBaseStyle,
+        fontStyle: 'italic',
+        color: RD.inkFade,
+        fontSize: 11.5,
+        fontFamily: RD.display,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ width: 14, textAlign: 'center' }}>{open ? '−' : '+'}</span>
+      {open ? 'Fewer agents' : 'More agents…'}
     </div>
   );
 }

@@ -15,7 +15,10 @@ import { useSessionOpener } from '../hooks/useSessionOpener';
 import { useTriageStatus } from '../hooks/useTriageStatus';
 import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
-import type { ChatTarget } from '../types';
+import type { ChatTarget, LineMenuContext } from '../types';
+import { REVISION_COLORS } from '../data/revisions';
+import { Toast, type ToastTone } from '../components/Toast';
+import { FindSimilarDrawer } from '../components/FindSimilarDrawer';
 
 function getNoteScenes(note: { scenes?: string[] } | undefined): string[] {
   if (!note) return [];
@@ -43,6 +46,14 @@ export default function Editor() {
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
+  const [revisionTaggedLineIds, setRevisionTaggedLineIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [findSimilarCtx, setFindSimilarCtx] = useState<LineMenuContext | null>(null);
+  const [highlightLineId, setHighlightLineId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: ToastTone } | null>(null);
+  const showToast = (text: string, tone: ToastTone = 'info') =>
+    setToast({ text, tone });
 
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
@@ -176,17 +187,131 @@ export default function Editor() {
   const activeNoteData = notes.find(n => n.id === activeNote);
   const linkedScenes = getNoteScenes(activeNoteData);
 
-  const handleLineAction = (action: string) => {
-    if (action === 'ask-dialogue') {
+  const handleLineAction = (action: string, ctx: LineMenuContext) => {
+    if (!data) return;
+
+    if (action.startsWith('ask-')) {
+      const agentId = action.slice(4);
+      setActiveAgent(agentId);
+      setChatTarget({ kind: 'agent', id: agentId });
+      return;
+    }
+
+    if (action === 'rewrite') {
       setActiveAgent('dialogue');
       setChatTarget({ kind: 'agent', id: 'dialogue' });
-    } else if (action === 'ask-structure') {
-      setActiveAgent('structure');
-      setChatTarget({ kind: 'agent', id: 'structure' });
-    } else if (action === 'ask-character') {
-      setActiveAgent('character');
-      setChatTarget({ kind: 'agent', id: 'character' });
+      setPendingChatMessage(`Rewrite this line: "${ctx.text}"`);
+      return;
     }
+
+    if (action === 'compress-expand') {
+      const mode = ctx.text.length > 80 ? 'shorter' : 'longer';
+      setActiveAgent('dialogue');
+      setChatTarget({ kind: 'agent', id: 'dialogue' });
+      setPendingChatMessage(`Make this ${mode}: "${ctx.text}"`);
+      return;
+    }
+
+    if (action === 'find-similar') {
+      if (!ctx.text.trim()) {
+        showToast('Select some text first', 'error');
+        return;
+      }
+      setFindSimilarCtx(ctx);
+      return;
+    }
+
+    if (action === 'note-this') {
+      if (!ctx.text.trim()) {
+        showToast('Select some text first', 'error');
+        return;
+      }
+      api
+        .createNote(data.screenplay.id, {
+          title: ctx.text.slice(0, 60),
+          body: ctx.text,
+          scenes: ctx.sceneId ? [ctx.sceneId] : [],
+          priority: 'medium',
+          status: 'unread',
+          origin: 'self',
+          confidence: 1.0,
+        })
+        .then(({ note }) => {
+          handleNoteCreated(note);
+          showToast('Note pinned to scene', 'success');
+        })
+        .catch(err => {
+          console.error('[note-this]', err);
+          showToast('Could not create note', 'error');
+        });
+      return;
+    }
+
+    if (action === 'tag-for-revision') {
+      setRevisionTaggedLineIds(prev => {
+        const next = new Set(prev);
+        if (next.has(ctx.lineId)) next.delete(ctx.lineId);
+        else next.add(ctx.lineId);
+        return next;
+      });
+      const rev =
+        REVISION_COLORS.find(r => r.id === revisionColor) || REVISION_COLORS[0];
+      const wasTagged = revisionTaggedLineIds.has(ctx.lineId);
+      showToast(
+        wasTagged ? `Untagged from ${rev.name}` : `Tagged for ${rev.name} revision`,
+        'success',
+      );
+      return;
+    }
+
+    if (action === 'voice-exemplar') {
+      if (ctx.lineType !== 'dialogue' || !ctx.character) {
+        showToast('Voice exemplar only works on dialogue lines', 'error');
+        return;
+      }
+      const char = data.characterBible.find(
+        c => c.name.toLowerCase() === ctx.character!.toLowerCase(),
+      );
+      if (!char) {
+        showToast(
+          `${ctx.character} not in bible — add them first`,
+          'error',
+        );
+        setBibleOpen(true);
+        return;
+      }
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              characterBible: prev.characterBible.map(c =>
+                c.id === char.id ? { ...c, voice: [...c.voice, ctx.text] } : c,
+              ),
+            }
+          : prev,
+      );
+      showToast(`Added to ${char.name}'s voice`, 'success');
+      return;
+    }
+
+    if (action === 'read') {
+      showToast('Read aloud isn’t wired yet', 'info');
+      return;
+    }
+
+    if (action === 'cut') {
+      showToast('Cut isn’t wired yet', 'info');
+      return;
+    }
+  };
+
+  const handleFindSimilarJump = (sceneId: string, lineId: string) => {
+    setActiveScene(sceneId);
+    setHighlightLineId(lineId);
+    setFindSimilarCtx(null);
+    setTimeout(() => {
+      setHighlightLineId(prev => (prev === lineId ? null : prev));
+    }, 2100);
   };
 
   const handleNoteCreated = (note: Note) => {
@@ -284,6 +409,8 @@ export default function Editor() {
             onAskScene={handleAskScene}
             title={screenplay.title}
             author={screenplay.author ?? undefined}
+            revisionTaggedLineIds={revisionTaggedLineIds}
+            highlightLineId={highlightLineId}
           />
         </div>
         <Divider
@@ -301,6 +428,7 @@ export default function Editor() {
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            position: 'relative',
           }}
         >
           <div style={{ flex: notesSplit, minHeight: 100, overflow: 'hidden' }}>
@@ -349,6 +477,15 @@ export default function Editor() {
               onPendingConsumed={() => setPendingChatMessage(null)}
             />
           </div>
+
+          {findSimilarCtx && (
+            <FindSimilarDrawer
+              ctx={findSimilarCtx}
+              scenes={scenes}
+              onClose={() => setFindSimilarCtx(null)}
+              onJump={handleFindSimilarJump}
+            />
+          )}
         </div>
       </div>
 
@@ -358,6 +495,13 @@ export default function Editor() {
         onClose={() => setBibleOpen(false)}
         characters={characterBible}
       />
+      {toast && (
+        <Toast
+          text={toast.text}
+          tone={toast.tone}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
