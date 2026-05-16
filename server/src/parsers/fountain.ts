@@ -37,7 +37,7 @@ export function parseFountain(source: string): ParsedScreenplay {
           current = { heading: 'UNTITLED', lines: [] };
           scenes.push(current);
         }
-        const text = (tok.text ?? '').trim();
+        const text = normalizeWhitespace(tok.text ?? '');
         if (text) {
           current.lines.push({ type: 'action', text });
         }
@@ -60,7 +60,7 @@ export function parseFountain(source: string): ParsedScreenplay {
         const line: ParsedLine = {
           type: 'dialogue',
           character: lastCharacter,
-          text: (tok.text ?? '').trim(),
+          text: normalizeWhitespace(tok.text ?? ''),
         };
         if (lastParenthetical) line.parenthetical = lastParenthetical;
         current.lines.push(line);
@@ -81,6 +81,14 @@ export function parseFountain(source: string): ParsedScreenplay {
 
 function stripBracketSceneNumber(s: string): string {
   return s.replace(/\s*#\S+#\s*$/, '').trim();
+}
+
+// Collapse all whitespace runs (including newlines from multi-line dialogue
+// or wrapped action paragraphs) to a single space, then trim. Without this,
+// `\n` characters survive into the DB and HTML rendering eats them with no
+// space replacement — "que hablar de" renders as "quehablarde".
+function normalizeWhitespace(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 export function serializeFountain(ps: ParsedScreenplay): string {
