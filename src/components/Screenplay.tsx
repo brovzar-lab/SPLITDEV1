@@ -509,43 +509,39 @@ export function Screenplay({
                     isLinked && !isActive ? `${RD.copper}05` : 'transparent',
                 }}
               >
-                {/* Page number */}
+                {/* Scene-header gutter: page number + any graduated agent
+                    pins, stacked together so the pins are clearly anchored
+                    to *this scene* not floating mid-body. */}
                 <div
                   style={{
                     position: 'absolute',
                     right: -42,
-                    top: 12,
-                    fontFamily: RD.display,
-                    fontStyle: 'italic',
-                    fontSize: 11,
-                    color: RD.inkFade,
+                    top: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    alignItems: 'flex-start',
                   }}
                 >
-                  p. {sceneStartPage}
-                </div>
-
-                {/* Agent reply pins (graduated chat replies anchored here) */}
-                {pinsHere.length > 0 && (
                   <div
                     style={{
-                      position: 'absolute',
-                      right: -42,
-                      top: 36,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                      alignItems: 'flex-start',
+                      fontFamily: RD.display,
+                      fontStyle: 'italic',
+                      fontSize: 11,
+                      color: RD.inkFade,
+                      lineHeight: 1,
                     }}
                   >
-                    {pinsHere.map(pin => (
-                      <AgentMarginPin
-                        key={pin.id}
-                        reply={pin}
-                        onBackToChat={() => onBackToChat?.(pin.id)}
-                      />
-                    ))}
+                    p. {sceneStartPage}
                   </div>
-                )}
+                  {pinsHere.map(pin => (
+                    <AgentMarginPin
+                      key={pin.id}
+                      reply={pin}
+                      onBackToChat={() => onBackToChat?.(pin.id)}
+                    />
+                  ))}
+                </div>
 
                 {/* Scene heading */}
                 <div
