@@ -796,27 +796,29 @@ export function Notes({
                     marginBottom: 6,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: '50%',
-                      background: origin.color,
-                      color: '#fff',
-                      fontFamily: RD.display,
-                      fontSize: 13,
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow:
-                        'inset 0 -1px 0 rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
-                      transform: 'rotate(-3deg)',
-                    }}
-                  >
-                    {origin.initial}
-                  </div>
+                  {n.origin !== 'self' && (
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        background: origin.color,
+                        color: '#fff',
+                        fontFamily: RD.display,
+                        fontSize: 13,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow:
+                          'inset 0 -1px 0 rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
+                        transform: 'rotate(-3deg)',
+                      }}
+                    >
+                      {origin.initial}
+                    </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
@@ -934,24 +936,26 @@ export function Notes({
                   gap: 10,
                 }}
               >
-                <div
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    flexShrink: 0,
-                    background: origin.color,
-                    color: '#fff',
-                    fontSize: 10,
-                    fontWeight: 800,
-                    fontFamily: RD.display,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {origin.initial}
-                </div>
+                {n.origin !== 'self' && (
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      background: origin.color,
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      fontFamily: RD.display,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {origin.initial}
+                  </div>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span
@@ -1057,23 +1061,36 @@ export function Notes({
                   alignItems: 'center',
                 }}
               >
-                <div
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    background: origin.color,
-                    color: '#fff',
-                    fontSize: 9,
-                    fontWeight: 800,
-                    fontFamily: RD.display,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {origin.initial}
-                </div>
+                {n.origin === 'self' ? (
+                  <span
+                    style={{
+                      color: RD.inkFade,
+                      fontSize: 12,
+                      textAlign: 'center',
+                      width: 18,
+                    }}
+                  >
+                    —
+                  </span>
+                ) : (
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      background: origin.color,
+                      color: '#fff',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      fontFamily: RD.display,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {origin.initial}
+                  </div>
+                )}
                 <span
                   style={{
                     fontFamily: RD.display,
