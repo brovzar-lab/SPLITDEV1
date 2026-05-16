@@ -1,5 +1,7 @@
 # SPLITDEV — The Writer's Atelier
 
+<img width="2034" height="1042" alt="SPLITDEV — The Writer's Atelier" src="https://github.com/user-attachments/assets/784ac6e5-0f20-4d99-8871-1ce109d85368" />
+
 A local-first screenplay editor that pairs a writer with named AI agents. Upload a real `.fountain` or `.fdx`, edit it inline with autosave, chat with Dialogue / Structure / Character / Horror / Conflict / Theme agents, and export back.
 
 Originally a static-mock prototype (`SPLITDEV_.zip` → `redesign/*.jsx`). MVP-1 ships a real Node + Express + SQLite backend and wires the existing React UI to it.
