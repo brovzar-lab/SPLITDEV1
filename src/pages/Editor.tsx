@@ -5,6 +5,7 @@ import { TopBar } from '../components/TopBar';
 import { Sidebar } from '../components/Sidebar';
 import { TimelineRibbon } from '../components/TimelineRibbon';
 import { OutlineDrawer } from '../components/OutlineDrawer';
+import { PresenceGrid } from '../components/PresenceGrid';
 import { Screenplay } from '../components/Screenplay';
 import { Notes } from '../components/Notes';
 import { Chat } from '../components/Chat';
@@ -54,6 +55,7 @@ export default function Editor() {
       return false;
     }
   });
+  const [presenceOpen, setPresenceOpen] = useState(false);
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
   const [revisionTaggedLineIds, setRevisionTaggedLineIds] = useState<Set<string>>(
     () => new Set(),
@@ -84,19 +86,30 @@ export default function Editor() {
   }, []);
 
   // T3.1 — ⌘O / Ctrl+O toggles the outline drawer; persist across reloads.
+  // T3.2 — `i` opens the Presence Grid inspector (single-key, no modifier).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const isCmdO = (e.metaKey || e.ctrlKey) && (e.key === 'o' || e.key === 'O');
-      if (!isCmdO) return;
-      // Don't hijack browser "Open file" inside an input/contenteditable.
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      e.preventDefault();
-      setOutlineOpen(prev => {
-        const next = !prev;
-        try { localStorage.setItem('splitdev.outline.open', next ? '1' : '0'); } catch {}
-        return next;
-      });
+      const inField = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+
+      const isCmdO = (e.metaKey || e.ctrlKey) && (e.key === 'o' || e.key === 'O');
+      if (isCmdO) {
+        if (inField) return;
+        e.preventDefault();
+        setOutlineOpen(prev => {
+          const next = !prev;
+          try { localStorage.setItem('splitdev.outline.open', next ? '1' : '0'); } catch {}
+          return next;
+        });
+        return;
+      }
+
+      if ((e.key === 'i' || e.key === 'I') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (inField) return;
+        e.preventDefault();
+        setPresenceOpen(prev => !prev);
+        return;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -510,6 +523,7 @@ export default function Editor() {
               scenes={scenes}
               beats={beats}
               notes={notes}
+              characters={characterBible}
             />
           )}
         </div>
@@ -629,6 +643,15 @@ export default function Editor() {
         open={bibleOpen}
         onClose={() => setBibleOpen(false)}
         characters={characterBible}
+      />
+      <PresenceGrid
+        open={presenceOpen}
+        onClose={() => setPresenceOpen(false)}
+        scenes={scenes}
+        characters={characterBible}
+        notes={notes}
+        activeScene={effectiveActiveScene}
+        setActiveScene={setActiveScene}
       />
       {toast && (
         <Toast
