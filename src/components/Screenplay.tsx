@@ -2,7 +2,12 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
+import { AGENTS } from '../data/agents';
 import type { Scene, Line } from '../api/types';
+
+const MORE_AGENTS_STORAGE_KEY = 'splitdev.contextmenu.moreAgents';
+const PRIMARY_AGENT_IDS = ['dialogue', 'structure', 'character'];
+const MORE_AGENT_IDS = ['horror', 'conflict', 'theme'];
 
 type LineMenuState = { x: number; y: number; text: string } | null;
 
@@ -485,19 +490,80 @@ interface LineContextMenuProps {
 }
 
 function LineContextMenu({ menu, onAction }: LineContextMenuProps) {
-  const items: Array<
-    | { divider: true }
-    | { label: string; icon: string; action: string; divider?: false }
-  > = [
-    { label: 'Ask Dialogue agent…', icon: '◈', action: 'ask-dialogue' },
-    { label: 'Ask Structure agent…', icon: '◇', action: 'ask-structure' },
-    { label: 'Ask Character agent…', icon: '○', action: 'ask-character' },
-    { divider: true },
-    { label: 'Rewrite this line', icon: '✎', action: 'rewrite' },
-    { label: 'Cut from script', icon: '✂', action: 'cut' },
-    { divider: true },
-    { label: 'Read aloud', icon: '♪', action: 'read' },
-  ];
+  const [showMore, setShowMore] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(MORE_AGENTS_STORAGE_KEY);
+      return raw ? Boolean(JSON.parse(raw)) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleMore = () => {
+    setShowMore(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(MORE_AGENTS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable — preference stays in-memory */
+      }
+      return next;
+    });
+  };
+
+  const primaryAgents = PRIMARY_AGENT_IDS.map(id =>
+    AGENTS.find(a => a.id === id),
+  ).filter((a): a is (typeof AGENTS)[number] => Boolean(a));
+  const moreAgents = MORE_AGENT_IDS.map(id =>
+    AGENTS.find(a => a.id === id),
+  ).filter((a): a is (typeof AGENTS)[number] => Boolean(a));
+
+  const rowStyle: CSSProperties = {
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontSize: 11.5,
+    color: RD.ink,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 2,
+  };
+
+  const renderAgentRow = (a: (typeof AGENTS)[number]) => (
+    <div
+      key={a.id}
+      onClick={() => onAction && onAction(`ask-${a.id}`, menu.text)}
+      style={rowStyle}
+      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ color: a.color, width: 14, textAlign: 'center', fontWeight: 700 }}>
+        {a.glyph}
+      </span>
+      <span style={{ color: RD.inkFade }}>→</span>
+      <span>{a.name}</span>
+    </div>
+  );
+
+  const renderActionRow = (label: string, icon: string, action: string) => (
+    <div
+      key={action}
+      onClick={() => onAction && onAction(action, menu.text)}
+      style={rowStyle}
+      onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ color: RD.copper, width: 14, textAlign: 'center' }}>{icon}</span>
+      {label}
+    </div>
+  );
+
+  const divider = (key: string) => (
+    <div
+      key={key}
+      style={{ height: 1, background: RD.line, margin: '3px 6px' }}
+    />
+  );
 
   return (
     <div
@@ -530,43 +596,27 @@ function LineContextMenu({ menu, onAction }: LineContextMenuProps) {
       >
         "{(menu.text || '').slice(0, 38)}…"
       </div>
-      {items.map((item, i) =>
-        'divider' in item && item.divider ? (
-          <div
-            key={i}
-            style={{ height: 1, background: RD.line, margin: '3px 6px' }}
-          />
-        ) : (
-          <div
-            key={i}
-            onClick={() =>
-              onAction &&
-              onAction((item as { action: string }).action, menu.text)
-            }
-            style={{
-              padding: '6px 10px',
-              cursor: 'pointer',
-              fontSize: 11.5,
-              color: RD.ink,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              borderRadius: 2,
-            }}
-            onMouseEnter={e =>
-              (e.currentTarget.style.background = RD.copperSoft)
-            }
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span
-              style={{ color: RD.copper, width: 14, textAlign: 'center' }}
-            >
-              {(item as { icon: string }).icon}
-            </span>
-            {(item as { label: string }).label}
-          </div>
-        ),
-      )}
+      {primaryAgents.map(renderAgentRow)}
+      {showMore && moreAgents.map(renderAgentRow)}
+      <div
+        onClick={toggleMore}
+        style={{
+          ...rowStyle,
+          fontStyle: 'italic',
+          color: RD.inkFade,
+          fontSize: 10.5,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = RD.copperSoft)}
+        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+      >
+        <span style={{ width: 14, textAlign: 'center' }}>{showMore ? '−' : '+'}</span>
+        {showMore ? 'Fewer agents' : 'More agents'}
+      </div>
+      {divider('d1')}
+      {renderActionRow('Rewrite this line', '✎', 'rewrite')}
+      {renderActionRow('Cut from script', '✂', 'cut')}
+      {divider('d2')}
+      {renderActionRow('Read aloud', '♪', 'read')}
     </div>
   );
 }
