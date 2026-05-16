@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { RD } from '../tokens';
 import { NOTE_ORIGINS } from '../data/notes';
-import type { Note } from '../api/types';
+import type { Note, Scene } from '../api/types';
 import { api } from '../api/client';
 import type { NoteOriginId, NoteStatus, PatternNote } from '../types';
 import { IngestModal } from './Notes/IngestModal';
 import { TriageView } from './Notes/TriageView';
+import { SheetView } from './Notes/SheetView';
 
 interface Props {
   notes: Note[];
@@ -20,6 +21,7 @@ interface Props {
   triageStatus?: 'pending' | 'running' | 'done' | 'failed';
   triageError?: string | null;
   activeSceneLabel?: string;
+  scenes?: Scene[];
 }
 
 type Density = 'sticky' | 'list' | 'sheet';
@@ -40,6 +42,7 @@ export function Notes({
   triageStatus,
   triageError,
   activeSceneLabel,
+  scenes = [],
 }: Props) {
   const [view, setView] = useState<View>('scene');
   const [showAll, setShowAll] = useState(false);
@@ -678,33 +681,15 @@ export function Notes({
           minHeight: 0,
         }}
       >
-        {/* Sheet header */}
         {view === 'scene' && density === 'sheet' && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '24px 1fr 60px 70px 80px 24px',
-              gap: 8,
-              padding: '8px 12px',
-              fontSize: 9,
-              fontWeight: 700,
-              color: RD.inkFade,
-              letterSpacing: 1,
-              textTransform: 'uppercase',
-              borderBottom: `2px solid ${RD.line}`,
-              background: RD.paperDeep,
-              position: 'sticky',
-              top: 0,
-              zIndex: 2,
-            }}
-          >
-            <span></span>
-            <span>Title</span>
-            <span>Scenes</span>
-            <span>Priority</span>
-            <span>Status</span>
-            <span></span>
-          </div>
+          <SheetView
+            notes={notes}
+            activeNote={activeNote}
+            setActiveNote={setActiveNote}
+            onDelete={handleDelete}
+            scenes={scenes}
+            activeStatusFilter={activeStatusFilter}
+          />
         )}
 
         {view === 'scene' && density === 'sticky' && (
@@ -837,144 +822,6 @@ export function Notes({
                     cursor: 'pointer',
                     padding: '0 4px',
                     borderRadius: 2,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
-                >
-                  ×
-                </span>
-              </div>
-            );
-          })}
-
-        {/* Sheet density */}
-        {view === 'scene' &&
-          density === 'sheet' &&
-          displayNotes.map(n => {
-            const isActive = activeNote === n.id;
-            const isMulti = n.scenes && n.scenes.length > 1;
-            const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
-            const statusColor =
-              n.status === 'applied'
-                ? RD.forest
-                : n.status === 'discussing'
-                ? RD.copper
-                : RD.gold;
-            return (
-              <div
-                key={n.id}
-                onClick={() => setActiveNote(n.id)}
-                style={{
-                  position: 'relative',
-                  display: 'grid',
-                  gridTemplateColumns: '24px 1fr 60px 70px 80px 24px',
-                  gap: 8,
-                  padding: '7px 12px',
-                  cursor: 'pointer',
-                  background: isActive ? RD.copperSoft + '60' : 'transparent',
-                  borderBottom: `1px solid ${RD.line}`,
-                  fontSize: 11,
-                  alignItems: 'center',
-                }}
-              >
-                {n.origin === 'self' ? (
-                  <span
-                    style={{
-                      color: RD.inkFade,
-                      fontSize: 12,
-                      textAlign: 'center',
-                      width: 18,
-                    }}
-                  >
-                    —
-                  </span>
-                ) : (
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: '50%',
-                      background: origin.color,
-                      color: '#fff',
-                      fontSize: 9,
-                      fontWeight: 800,
-                      fontFamily: RD.display,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {origin.initial}
-                  </div>
-                )}
-                <span
-                  style={{
-                    fontFamily: RD.display,
-                    fontWeight: 600,
-                    color: RD.ink,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {n.title}
-                </span>
-                <span
-                  style={{
-                    fontFamily: RD.script,
-                    color: RD.inkSoft,
-                    fontSize: 10,
-                  }}
-                >
-                  {isMulti ? `${n.scenes!.length} scns` : `1 scn`}
-                </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    color:
-                      n.priority === 'high'
-                        ? RD.ruby
-                        : n.priority === 'medium'
-                        ? RD.gold
-                        : RD.inkFade,
-                  }}
-                >
-                  {n.priority}
-                </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    color: statusColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: statusColor,
-                    }}
-                  />
-                  {n.status}
-                </span>
-                <span
-                  onClick={(e) => handleDelete(n.id, e)}
-                  style={{
-                    fontSize: 14,
-                    color: RD.inkFade,
-                    cursor: 'pointer',
-                    padding: '0 4px',
-                    borderRadius: 2,
-                    textAlign: 'center',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
