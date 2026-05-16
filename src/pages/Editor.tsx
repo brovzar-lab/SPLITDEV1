@@ -6,6 +6,7 @@ import { Sidebar } from '../components/Sidebar';
 import { TimelineRibbon } from '../components/TimelineRibbon';
 import { OutlineDrawer } from '../components/OutlineDrawer';
 import { PresenceGrid } from '../components/PresenceGrid';
+import { ReadingMode } from '../components/ReadingMode';
 import { Screenplay } from '../components/Screenplay';
 import { Notes } from '../components/Notes';
 import { Chat } from '../components/Chat';
@@ -56,6 +57,14 @@ export default function Editor() {
     }
   });
   const [presenceOpen, setPresenceOpen] = useState(false);
+  const [readingOpen, setReadingOpen] = useState(false);
+  const [readingLastScene, setReadingLastScene] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('splitdev.read.lastScene');
+    } catch {
+      return null;
+    }
+  });
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
   const [revisionTaggedLineIds, setRevisionTaggedLineIds] = useState<Set<string>>(
     () => new Set(),
@@ -108,6 +117,13 @@ export default function Editor() {
         if (inField) return;
         e.preventDefault();
         setPresenceOpen(prev => !prev);
+        return;
+      }
+
+      // T3.3 — ⌘\ / Ctrl+\ toggles full-bleed reading mode.
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        setReadingOpen(prev => !prev);
         return;
       }
     };
@@ -652,6 +668,19 @@ export default function Editor() {
         notes={notes}
         activeScene={effectiveActiveScene}
         setActiveScene={setActiveScene}
+      />
+      <ReadingMode
+        open={readingOpen}
+        scenes={scenes}
+        initialSceneId={readingLastScene ?? effectiveActiveScene}
+        onClose={lastSceneId => {
+          setReadingOpen(false);
+          if (lastSceneId) {
+            setReadingLastScene(lastSceneId);
+            setActiveScene(lastSceneId);
+            try { localStorage.setItem('splitdev.read.lastScene', lastSceneId); } catch {}
+          }
+        }}
       />
       {toast && (
         <Toast
