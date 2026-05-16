@@ -739,6 +739,12 @@ export function Notes({
             const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
             const stickyBg = stickyByOrigin[n.origin as NoteOriginId] || RD.stickyYellow;
             const rotation = isActive ? 0 : rotations[i % rotations.length];
+            const priorityRule =
+              n.priority === 'high'
+                ? `3px solid ${RD.ruby}`
+                : n.priority === 'medium'
+                ? `3px solid ${RD.gold}`
+                : '3px solid transparent';
 
             return (
               <div
@@ -746,7 +752,7 @@ export function Notes({
                 onClick={() => setActiveNote(n.id)}
                 style={{
                   position: 'relative',
-                  padding: '12px 14px 14px',
+                  padding: '12px 14px 14px 20px',
                   marginBottom: 14,
                   background: stickyBg,
                   boxShadow: isActive ? RD.shadowDeep : RD.shadowSticky,
@@ -754,6 +760,7 @@ export function Notes({
                   transform: `rotate(${rotation}deg)`,
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   borderRadius: '1px 1px 8px 1px',
+                  borderLeft: priorityRule,
                 }}
               >
                 <div
@@ -878,28 +885,6 @@ export function Notes({
                   }}
                 >
                   <StatusStamp status={n.status} />
-                  <span
-                    style={{
-                      fontFamily: RD.display,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      fontStyle: 'italic',
-                      color:
-                        n.priority === 'high'
-                          ? RD.ruby
-                          : n.priority === 'medium'
-                          ? RD.gold
-                          : RD.inkFade,
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {n.priority === 'high'
-                      ? '★★★'
-                      : n.priority === 'medium'
-                      ? '★★'
-                      : '★'}{' '}
-                    {n.priority}
-                  </span>
                 </div>
               </div>
             );
