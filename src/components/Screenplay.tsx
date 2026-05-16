@@ -1,8 +1,51 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { RD } from '../tokens';
 import { REVISION_COLORS } from '../data/revisions';
+import { AGENTS } from '../data/agents';
 import type { Scene, Line } from '../api/types';
+
+const TOKEN_TO_AGENT: Record<string, string> = {
+  D: 'dialogue',
+  S: 'structure',
+  C: 'character',
+  H: 'horror',
+  K: 'conflict',
+  T: 'theme',
+};
+
+function renderInlineTags(text: string): ReactNode {
+  if (!text || !text.includes('[[')) return text;
+  const parts: ReactNode[] = [];
+  const regex = /\[\[([A-Z])\]\]/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = regex.exec(text)) !== null) {
+    const m = match;
+    if (m.index > lastIndex) {
+      parts.push(text.slice(lastIndex, m.index));
+    }
+    const agent = AGENTS.find(a => a.id === TOKEN_TO_AGENT[m[1]]);
+    if (agent) {
+      parts.push(
+        <span
+          key={`agtag-${key++}`}
+          aria-hidden="true"
+          style={{
+            display: 'inline-block',
+            width: '6ch',
+            borderBottom: `1.5px solid ${agent.color}`,
+            verticalAlign: 'baseline',
+          }}
+        />,
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 type LineMenuState = { x: number; y: number; text: string } | null;
 
@@ -164,7 +207,7 @@ export function Screenplay({
               suppressContentEditableWarning
               onBlur={e => onLineEdit?.(line.id, { parenthetical: e.currentTarget.textContent ?? '' })}
             >
-              ({line.parenthetical})
+              ({renderInlineTags(line.parenthetical)})
             </div>
           )}
           <div
@@ -173,7 +216,7 @@ export function Screenplay({
             suppressContentEditableWarning
             onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
           >
-            {line.text}
+            {renderInlineTags(line.text)}
           </div>
         </div>,
       );
@@ -193,7 +236,7 @@ export function Screenplay({
         suppressContentEditableWarning
         onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
       >
-        {line.text}
+        {renderInlineTags(line.text)}
       </div>,
     );
   };
