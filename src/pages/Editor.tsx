@@ -15,7 +15,7 @@ import { useSessionOpener } from '../hooks/useSessionOpener';
 import { useTriageStatus } from '../hooks/useTriageStatus';
 import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
-import type { ChatTarget, LineMenuContext } from '../types';
+import type { AgentReply, ChatTarget, LineMenuContext } from '../types';
 import { REVISION_COLORS } from '../data/revisions';
 import { Toast, type ToastTone } from '../components/Toast';
 import { FindSimilarDrawer } from '../components/FindSimilarDrawer';
@@ -54,6 +54,84 @@ export default function Editor() {
   const [toast, setToast] = useState<{ text: string; tone: ToastTone } | null>(null);
   const showToast = (text: string, tone: ToastTone = 'info') =>
     setToast({ text, tone });
+
+  // T2.2 — agent replies: streaming/done lives in chat cards, graduated
+  // lives as a gutter pin on the script. 4s after a reply lands as 'done',
+  // it auto-graduates unless the user keeps it in the card.
+  const [agentReplies, setAgentReplies] = useState<AgentReply[]>([]);
+  const graduateTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearGraduateTimer = (id: string) => {
+    const t = graduateTimers.current.get(id);
+    if (t) {
+      clearTimeout(t);
+      graduateTimers.current.delete(id);
+    }
+  };
+
+  useEffect(() => () => {
+    graduateTimers.current.forEach(t => clearTimeout(t));
+    graduateTimers.current.clear();
+  }, []);
+
+  const handleAgentReplyDone = (input: {
+    agentId: string;
+    sceneId: string;
+    prompt: string;
+    body: string;
+  }) => {
+    const id = `ar-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const reply: AgentReply = {
+      id,
+      agentId: input.agentId,
+      sceneId: input.sceneId,
+      prompt: input.prompt,
+      body: input.body,
+      status: 'done',
+      createdAt: Date.now(),
+    };
+    setAgentReplies(prev => {
+      // Cap at most one 'done' per agent in the chat panel — earlier dones
+      // graduate immediately so the card stack stays clean.
+      const next = prev.map(r =>
+        r.agentId === input.agentId && r.status === 'done'
+          ? { ...r, status: 'graduated' as const }
+          : r,
+      );
+      return [...next, reply];
+    });
+    const timer = setTimeout(() => {
+      setAgentReplies(prev =>
+        prev.map(r => (r.id === id ? { ...r, status: 'graduated' as const } : r)),
+      );
+      graduateTimers.current.delete(id);
+    }, 4000);
+    graduateTimers.current.set(id, timer);
+  };
+
+  const handleAgentReplyGraduate = (replyId: string) => {
+    clearGraduateTimer(replyId);
+    setAgentReplies(prev =>
+      prev.map(r => (r.id === replyId ? { ...r, status: 'graduated' as const } : r)),
+    );
+  };
+
+  const handleAgentReplyBackToChat = (replyId: string) => {
+    clearGraduateTimer(replyId);
+    setAgentReplies(prev =>
+      prev.map(r =>
+        r.id === replyId
+          ? { ...r, status: 'done' as const, createdAt: Date.now() }
+          : r.agentId ===
+            prev.find(x => x.id === replyId)?.agentId &&
+            r.status === 'done'
+          ? { ...r, status: 'graduated' as const }
+          : r,
+      ),
+    );
+  };
+
+  const graduatedReplies = agentReplies.filter(r => r.status === 'graduated');
 
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
@@ -411,6 +489,8 @@ export default function Editor() {
             author={screenplay.author ?? undefined}
             revisionTaggedLineIds={revisionTaggedLineIds}
             highlightLineId={highlightLineId}
+            graduatedReplies={graduatedReplies}
+            onBackToChat={handleAgentReplyBackToChat}
           />
         </div>
         <Divider
@@ -475,6 +555,10 @@ export default function Editor() {
               greeting={greeting}
               pendingMessage={pendingChatMessage}
               onPendingConsumed={() => setPendingChatMessage(null)}
+              activeSceneId={effectiveActiveScene}
+              agentReplies={agentReplies}
+              onAgentReplyDone={handleAgentReplyDone}
+              onAgentReplyGraduate={handleAgentReplyGraduate}
             />
           </div>
 
