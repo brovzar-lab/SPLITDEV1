@@ -317,12 +317,13 @@ export function Screenplay({
                     position: 'absolute',
                     right: -42,
                     top: 12,
-                    fontFamily: RD.script,
+                    fontFamily: RD.display,
+                    fontStyle: 'italic',
                     fontSize: 11,
                     color: RD.inkFade,
                   }}
                 >
-                  {sceneStartPage}.
+                  p. {sceneStartPage}
                 </div>
 
                 {/* Scene heading */}
