@@ -90,15 +90,84 @@ export function Bible({ open, onClose, characters }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'column',
-            gap: 10,
-            color: RD.inkFade,
-            fontFamily: RD.display,
-            fontStyle: 'italic',
+            padding: '0 28px',
+            textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, opacity: 0.2 }}>⊙</div>
-          <div style={{ fontSize: 14 }}>No characters in bible yet</div>
-          <div style={{ fontSize: 11, opacity: 0.7 }}>They'll appear after parsing</div>
+          <div
+            style={{
+              fontFamily: RD.display,
+              fontSize: 10,
+              fontStyle: 'italic',
+              fontVariant: 'small-caps',
+              color: RD.inkFade,
+              letterSpacing: 2,
+              marginBottom: 18,
+            }}
+          >
+            Reference for AI agents
+          </div>
+          <svg
+            width="120"
+            height="120"
+            viewBox="0 0 120 120"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            style={{ marginBottom: 16 }}
+          >
+            <rect x="22" y="14" width="76" height="92" fill={RD.paper} stroke={RD.line} strokeWidth="2" />
+            <line x1="32" y1="14" x2="32" y2="106" stroke={RD.line} strokeWidth="1.5" />
+            <rect x="40" y="34" width="50" height="22" fill="none" stroke={RD.line} strokeWidth="1" strokeDasharray="3 2" />
+            <line x1="45" y1="44" x2="80" y2="44" stroke={RD.line} strokeWidth="1" />
+            <line x1="45" y1="49" x2="70" y2="49" stroke={RD.line} strokeWidth="1" />
+            <rect x="98" y="30" width="6" height="10" fill={RD.line} />
+            <rect x="98" y="50" width="6" height="10" fill={RD.line} />
+            <rect x="98" y="70" width="6" height="10" fill={RD.line} />
+          </svg>
+          <div
+            style={{
+              fontFamily: RD.display,
+              fontSize: 22,
+              fontStyle: 'italic',
+              color: RD.ink,
+              marginBottom: 12,
+            }}
+          >
+            The bible is empty.
+          </div>
+          <div
+            style={{
+              fontFamily: RD.sans,
+              fontSize: 13,
+              color: RD.inkSoft,
+              lineHeight: 1.5,
+              maxWidth: 320,
+              marginBottom: 22,
+            }}
+          >
+            A character is added the third time the script names them.
+            Press Parse to send the script through the reader.
+          </div>
+          <button
+            onClick={() => {
+              // TODO: wire to the parse pipeline
+            }}
+            style={{
+              padding: '4px 11px',
+              fontFamily: RD.display,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1,
+              textTransform: 'uppercase',
+              background: RD.copper,
+              color: RD.paper,
+              border: 'none',
+              borderRadius: 1,
+              cursor: 'pointer',
+            }}
+          >
+            Parse the script
+          </button>
         </div>
       ) : (
         <>
