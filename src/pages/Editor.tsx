@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RD } from '../tokens';
 import { TopBar } from '../components/TopBar';
@@ -21,6 +21,7 @@ import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
 import type { AgentReply, ChatTarget, LineMenuContext } from '../types';
 import { REVISION_COLORS } from '../data/revisions';
+import { applyDemoRevisions } from '../data/demoRevisions';
 import { Toast, type ToastTone } from '../components/Toast';
 import { FindSimilarDrawer } from '../components/FindSimilarDrawer';
 
@@ -46,6 +47,8 @@ export default function Editor() {
   const [middleW, setMiddleW] = useState(380);
   const [notesSplit, setNotesSplit] = useState(0.48);
   const [revisionColor, setRevisionColor] = useState('blue');
+  const [compareToBase, setCompareToBase] = useState(false);
+  const baseRevisionId = 'white';
   const [viewMode, setViewMode] = useState<'script' | 'cards'>('script');
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
@@ -306,7 +309,10 @@ export default function Editor() {
     );
   }
 
-  const { screenplay, scenes, notes, characterBible, beats } = data;
+  const { screenplay, notes, characterBible, beats } = data;
+  // T3.4 — paint demo revision states onto a handful of lines so the diff
+  // overlay has something to render against the live data.
+  const scenes = useMemo(() => applyDemoRevisions(data.scenes), [data.scenes]);
 
   // Set default active scene to first scene on first load
   const effectiveActiveScene =
@@ -500,6 +506,9 @@ export default function Editor() {
         screenplayId={data.screenplay.id}
         revisionColor={revisionColor}
         setRevisionColor={setRevisionColor}
+        compareToBase={compareToBase}
+        setCompareToBase={setCompareToBase}
+        baseRevisionId={baseRevisionId}
         viewMode={viewMode}
         setViewMode={setViewMode}
         characterFilter={characterFilter}
@@ -568,6 +577,7 @@ export default function Editor() {
             highlightLineId={highlightLineId}
             graduatedReplies={graduatedReplies}
             onBackToChat={handleAgentReplyBackToChat}
+            compareToBase={compareToBase}
           />
         </div>
         <Divider

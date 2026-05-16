@@ -100,6 +100,18 @@ export interface RevisionColor {
 
 export type BeatKind = 'major' | 'minor';
 
+// T3.4 — colored-draft diff overlay. Lines carry an optional revision marker
+// the topbar's "Compare to {base}" toggle reads to render strike-throughs and
+// tinted insertions. Line-level changes use deletedText (old) + text (new);
+// inline word-level changes use the insertions/deletions span arrays.
+export interface LineRevisionState {
+  revisionId: string;
+  changedSince?: string;
+  deletedText?: string;
+  insertions?: Array<{ from: number; to: number; text: string }>;
+  deletions?: Array<{ from: number; to: number; text: string }>;
+}
+
 export interface Beat {
   id: string;
   name: string;

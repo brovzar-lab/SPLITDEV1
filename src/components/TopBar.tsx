@@ -11,6 +11,9 @@ interface TopBarProps {
   screenplayId: string;
   revisionColor: string;
   setRevisionColor: (id: string) => void;
+  compareToBase: boolean;
+  setCompareToBase: (v: boolean) => void;
+  baseRevisionId: string;
   viewMode: 'script' | 'cards';
   setViewMode: (m: 'script' | 'cards') => void;
   characterFilter: string | null;
@@ -28,6 +31,9 @@ export function TopBar({
   screenplayId,
   revisionColor,
   setRevisionColor,
+  compareToBase,
+  setCompareToBase,
+  baseRevisionId,
   viewMode,
   setViewMode,
   pageCount,
@@ -42,6 +48,9 @@ export function TopBar({
   const [exportOpen, setExportOpen] = useState(false);
   const currentRev =
     REVISION_COLORS.find(r => r.id === revisionColor) || REVISION_COLORS[0];
+  const baseRev =
+    REVISION_COLORS.find(r => r.id === baseRevisionId) || REVISION_COLORS[0];
+  const baseLabel = baseRev.name.replace(' Revision', '').replace(' Draft', '');
 
   return (
     <div
@@ -215,6 +224,30 @@ export function TopBar({
               />
               {currentRev.name.replace(' Revision', '').replace(' Draft', '')} Draft
             </div>
+            {compareToBase && !showRev && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '110%',
+                  right: 0,
+                  marginTop: 4,
+                  padding: '2px 8px',
+                  background: RD.copper,
+                  color: RD.paper,
+                  fontFamily: RD.sans,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                  borderRadius: 2,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                }}
+              >
+                Δ vs {baseLabel}
+              </div>
+            )}
             {showRev && (
               <div
                 style={{
@@ -265,6 +298,41 @@ export function TopBar({
                     {r.name}
                   </div>
                 ))}
+
+                {/* T3.4 — Compare to base toggle */}
+                <div
+                  style={{
+                    marginTop: 6,
+                    paddingTop: 6,
+                    borderTop: `1px dashed ${RD.line}`,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '5px 8px',
+                      cursor: 'pointer',
+                      color: RD.ink,
+                      fontSize: 11,
+                      fontWeight: compareToBase ? 700 : 500,
+                      userSelect: 'none',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={compareToBase}
+                      onChange={e => setCompareToBase(e.target.checked)}
+                      style={{
+                        margin: 0,
+                        cursor: 'pointer',
+                        accentColor: RD.copper,
+                      }}
+                    />
+                    Compare to {baseLabel}
+                  </label>
+                </div>
               </div>
             )}
           </div>

@@ -6,6 +6,7 @@ import { AGENTS } from '../data/agents';
 import type { Scene, Line } from '../api/types';
 import type { AgentReply, LineMenuContext } from '../types';
 import { AgentMarginPin } from './AgentMarginPin';
+import { hasChange, renderTextWithInlineDiff } from '../lib/diffRender';
 
 const TOKEN_TO_AGENT: Record<string, string> = {
   D: 'dialogue',
@@ -77,6 +78,7 @@ interface ScreenplayProps {
   highlightLineId?: string | null;
   graduatedReplies?: AgentReply[];
   onBackToChat?: (replyId: string) => void;
+  compareToBase?: boolean;
 }
 
 const btnStyle = (bg: string, fg: string): CSSProperties => ({
@@ -123,6 +125,7 @@ export function Screenplay({
   highlightLineId,
   graduatedReplies,
   onBackToChat,
+  compareToBase = false,
 }: ScreenplayProps) {
   const sceneRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const revColor =
@@ -228,6 +231,8 @@ export function Screenplay({
   const renderLine = (line: Line, key: string, sceneId: string) => {
     const isTagged = revisionTaggedLineIds?.has(line.id);
     const isHighlight = highlightLineId === line.id;
+    const diffOn = compareToBase && hasChange(line.revision);
+    const isReplaced = diffOn && line.revision?.deletedText !== undefined;
     const lineDataAttrs = {
       'data-line-id': line.id,
       'data-scene-id': sceneId,
@@ -236,6 +241,37 @@ export function Screenplay({
         ? { 'data-line-character': line.character }
         : {}),
     } as Record<string, string>;
+
+    // T3.4 margin asterisk:
+    // - revision-change (insertion or word-level) → revColor asterisk
+    // - line-level deletion → ruby asterisk
+    // - tag-for-revision (T2.1) → revColor asterisk
+    // - none → blank
+    const marginGlyph = isReplaced
+      ? '*'
+      : diffOn
+      ? '*'
+      : isTagged
+      ? '*'
+      : '';
+    const marginColor = isReplaced
+      ? RD.ruby
+      : diffOn
+      ? revColor.border
+      : isTagged
+      ? revColor.border
+      : RD.ruby;
+
+    // Pick the right text renderer: inline diff when comparing and line has
+    // word-level changes; otherwise the agent-tag renderer (T1.1).
+    const hasInlineDiff =
+      diffOn &&
+      ((line.revision?.insertions?.length ?? 0) > 0 ||
+        (line.revision?.deletions?.length ?? 0) > 0);
+    const renderText = (text: string): ReactNode =>
+      hasInlineDiff
+        ? renderTextWithInlineDiff(text, line.revision, revColor.border)
+        : renderInlineTags(text);
 
     const wrap = (content: React.ReactNode) => (
       <div
@@ -248,14 +284,39 @@ export function Screenplay({
           alignItems: 'flex-start',
           gap: 0,
           position: 'relative',
+          background: diffOn && !isReplaced ? `${revColor.border}1c` : undefined,
+          borderLeft:
+            diffOn && !isReplaced
+              ? `2px solid ${revColor.border}`
+              : '2px solid transparent',
+          margin: diffOn && !isReplaced ? '0 0 0 -6px' : undefined,
+          padding: diffOn && !isReplaced ? '2px 0 2px 4px' : undefined,
         }}
       >
-        <div style={{ minWidth: 0 }}>{content}</div>
+        <div style={{ minWidth: 0 }}>
+          {isReplaced && line.revision?.deletedText && (
+            <div
+              style={{
+                fontFamily: RD.script,
+                fontSize: 13,
+                color: RD.inkFade,
+                textDecoration: `line-through ${RD.ruby}`,
+                textDecorationThickness: 1.5,
+                lineHeight: 1.85,
+                padding: '2px 0',
+              }}
+              aria-hidden="true"
+            >
+              {line.revision.deletedText}
+            </div>
+          )}
+          {content}
+        </div>
         <div
           style={{
             fontFamily: RD.script,
             fontSize: 13,
-            color: isTagged ? revColor.border : RD.ruby,
+            color: marginColor,
             fontWeight: 700,
             textAlign: 'right',
             lineHeight: 1.8,
@@ -263,7 +324,7 @@ export function Screenplay({
           }}
           aria-hidden="true"
         >
-          {isTagged ? '*' : ''}
+          {marginGlyph}
         </div>
       </div>
     );
@@ -306,7 +367,7 @@ export function Screenplay({
             suppressContentEditableWarning
             onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
           >
-            {renderInlineTags(line.text)}
+            {renderText(line.text)}
           </div>
         </div>,
       );
@@ -327,7 +388,7 @@ export function Screenplay({
         suppressContentEditableWarning
         onBlur={e => onLineEdit?.(line.id, { text: e.currentTarget.textContent ?? '' })}
       >
-        {renderInlineTags(line.text)}
+        {renderText(line.text)}
       </div>,
     );
   };

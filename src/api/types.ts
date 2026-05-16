@@ -25,6 +25,14 @@ export interface Scene {
   eighths: string | null;
 }
 
+export interface LineRevisionState {
+  revisionId: string;
+  changedSince?: string;
+  deletedText?: string;
+  insertions?: Array<{ from: number; to: number; text: string }>;
+  deletions?: Array<{ from: number; to: number; text: string }>;
+}
+
 export interface Line {
   id: string;
   scene_id: string;
@@ -33,6 +41,7 @@ export interface Line {
   character: string | null;
   parenthetical: string | null;
   text: string;
+  revision?: LineRevisionState;
 }
 
 export interface Note {
