@@ -473,21 +473,10 @@ export function Screenplay({
             const isActive = scene.id === activeScene;
             const isLinked = linkedScenes.includes(scene.id);
             const sceneStartPage = Math.floor(runningLines / linesPerPage) + 1;
-            const sceneStartLineIdx = runningLines % linesPerPage;
             runningLines += scene.lines.length + 3;
             const pinsHere = (graduatedReplies ?? []).filter(
               r => r.sceneId === scene.id,
             );
-
-            const pageBreaksInScene: number[] = [];
-            let lineCounter = sceneStartLineIdx + 3;
-            scene.lines.forEach((_, li) => {
-              if (lineCounter >= linesPerPage) {
-                pageBreaksInScene.push(li);
-                lineCounter = 0;
-              }
-              lineCounter++;
-            });
 
             return (
               <div
@@ -603,13 +592,6 @@ export function Screenplay({
                 {scene.lines.map((line, li) => (
                   <Fragment key={`${si}-${li}`}>
                     {renderLine(line, `${si}-${li}`, scene.id)}
-                    {pageBreaksInScene.includes(li) && (
-                      <PageBreak
-                        pageNum={
-                          sceneStartPage + pageBreaksInScene.indexOf(li) + 1
-                        }
-                      />
-                    )}
                   </Fragment>
                 ))}
               </div>
@@ -636,39 +618,6 @@ export function Screenplay({
 
       {lineMenu && <LineContextMenu menu={lineMenu} onAction={onLineAction} />}
     </Fragment>
-  );
-}
-
-function PageBreak({ pageNum }: { pageNum: number }) {
-  return (
-    <div
-      style={{
-        margin: '20px -12px',
-        padding: '12px 0',
-        borderTop: `1px dashed ${RD.lineDeep}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        fontFamily: RD.script,
-        fontSize: 10,
-        color: RD.inkFade,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-        position: 'relative',
-      }}
-    >
-      <span
-        style={{
-          background: '#fefcf2',
-          padding: '0 10px',
-          color: RD.copper,
-          fontWeight: 700,
-        }}
-      >
-        — Page {pageNum} —
-      </span>
-    </div>
   );
 }
 
