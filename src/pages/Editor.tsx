@@ -523,6 +523,9 @@ export default function Editor() {
               onNoteDeleted={handleNoteDeleted}
               triageStatus={triage.status}
               triageError={triage.error}
+              activeSceneLabel={
+                scenes.find(s => s.id === effectiveActiveScene)?.position?.toString()
+              }
             />
           </div>
           <Divider

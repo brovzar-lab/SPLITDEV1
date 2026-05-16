@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useState } from 'react';
 import { RD } from '../tokens';
 import { NOTE_ORIGINS } from '../data/notes';
 import type { Note } from '../api/types';
 import { api } from '../api/client';
 import type { NoteOriginId, NoteStatus, PatternNote } from '../types';
 import { IngestModal } from './Notes/IngestModal';
+import { TriageView } from './Notes/TriageView';
 
 interface Props {
   notes: Note[];
@@ -19,49 +19,14 @@ interface Props {
   onNoteDeleted: (id: string) => void;
   triageStatus?: 'pending' | 'running' | 'done' | 'failed';
   triageError?: string | null;
+  activeSceneLabel?: string;
 }
 
 type Density = 'sticky' | 'list' | 'sheet';
 type View = 'scene' | 'pattern';
 
-const stickyByOrigin: Record<NoteOriginId, string> = {
-  exec: RD.stickyPink,
-  producer: RD.stickyBlue,
-  director: RD.stickyBlue,
-  reader: RD.stickyGreen,
-  table: RD.stickyYellow,
-  self: RD.stickyYellow,
-};
-
-const rotations = [-0.6, 0.4, -0.3, 0.7, -0.5, 0.5];
-
-function StatusStamp({ status }: { status: NoteStatus }) {
-  const map: Record<NoteStatus, { c: string; label: string }> = {
-    discussing: { c: RD.copper, label: 'In discussion' },
-    unread: { c: RD.gold, label: 'Open' },
-    applied: { c: RD.forest, label: 'Applied' },
-  };
-  const s = map[status] || map.unread;
-  return (
-    <span
-      style={{
-        fontFamily: RD.display,
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
-        color: s.c,
-        border: `1.5px solid ${s.c}`,
-        padding: '1px 6px',
-        borderRadius: 1,
-        transform: 'rotate(-1deg)',
-        display: 'inline-block',
-      }}
-    >
-      {s.label}
-    </span>
-  );
-}
+// Sticky-origin palette, board rotations, and StatusStamp moved to
+// Notes/TriageView.tsx (T2.3). List/Sheet branches use inline styles.
 
 export function Notes({
   notes,
@@ -74,6 +39,7 @@ export function Notes({
   onNoteDeleted,
   triageStatus,
   triageError,
+  activeSceneLabel,
 }: Props) {
   const [view, setView] = useState<View>('scene');
   const [showAll, setShowAll] = useState(false);
@@ -85,6 +51,12 @@ export function Notes({
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [creating, setCreating] = useState(false);
   const [ingestOpen, setIngestOpen] = useState(false);
+
+  // T2.3 — Triage view state. Drawer is collapsed by default; Distribution
+  // Strip toggles a single-status filter that applies to the pile (and to
+  // the T2.4 table view once it lands).
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
+  const [activeStatusFilter, setActiveStatusFilter] = useState<NoteStatus | null>(null);
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
@@ -121,10 +93,8 @@ export function Notes({
     }
   };
 
-  useEffect(() => {
-    if (notes.length > 8 && density === 'sticky') setDensity('list');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // T2.3 — the drawer/pinned layout now handles the >8-notes case natively,
+  // so don't force-switch density to 'list' anymore.
 
   // Empty state — no notes at all
   if (notes.length === 0 && patternNotes.length === 0) {
@@ -182,20 +152,22 @@ export function Notes({
             <button
               onClick={() => setNewOpen(o => !o)}
               style={{
-                padding: '4px 10px',
-                fontSize: 10,
-                fontFamily: RD.display,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
+                padding: '6px 12px 7px',
                 background: RD.copper,
                 color: RD.paper,
+                fontFamily: RD.sans,
+                fontSize: 10.5,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                textTransform: 'uppercase',
                 border: 'none',
                 borderRadius: 2,
                 cursor: 'pointer',
+                boxShadow:
+                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
               }}
             >
-              + New note
+              ＋ New note
             </button>
           </div>
         </div>
@@ -407,11 +379,13 @@ export function Notes({
                 marginTop: 4,
               }}
             >
-              From the desk
+              {density === 'sticky' && view === 'scene' && activeScene
+                ? `${activeSceneLabel ? `Scene ${activeSceneLabel}` : 'Active scene'} · ${notes.filter(n => (n.scenes ?? []).includes(activeScene)).length} pinned`
+                : 'From the desk'}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {activeScene && view === 'scene' && !noSceneNotes && !showAll && (
+            {activeScene && view === 'scene' && !noSceneNotes && !showAll && density !== 'sticky' && (
               <span
                 onClick={() => setShowAll(true)}
                 style={{
@@ -447,20 +421,22 @@ export function Notes({
             <button
               onClick={() => setNewOpen(o => !o)}
               style={{
-                padding: '4px 10px',
-                fontSize: 10,
-                fontFamily: RD.display,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
+                padding: '6px 12px 7px',
                 background: RD.copper,
                 color: RD.paper,
+                fontFamily: RD.sans,
+                fontSize: 10.5,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                textTransform: 'uppercase',
                 border: 'none',
                 borderRadius: 2,
                 cursor: 'pointer',
+                boxShadow:
+                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
               }}
             >
-              + New note
+              ＋ New note
             </button>
           </div>
         </div>
@@ -668,7 +644,7 @@ export function Notes({
         </div>
       )}
 
-      {noSceneNotes && !showAll && view === 'scene' && (
+      {noSceneNotes && !showAll && view === 'scene' && density !== 'sticky' && (
         <div
           style={{
             padding: '8px 16px',
@@ -697,7 +673,7 @@ export function Notes({
       <div
         style={{
           flex: 1,
-          padding: density === 'sticky' ? '14px 12px' : '0',
+          padding: 0,
           overflowY: 'auto',
           minHeight: 0,
         }}
@@ -731,164 +707,19 @@ export function Notes({
           </div>
         )}
 
-        {view === 'scene' &&
-          density === 'sticky' &&
-          displayNotes.map((n, i) => {
-            const isActive = activeNote === n.id;
-            const isMulti = n.scenes && n.scenes.length > 1;
-            const origin = NOTE_ORIGINS[n.origin as NoteOriginId] || NOTE_ORIGINS.self;
-            const stickyBg = stickyByOrigin[n.origin as NoteOriginId] || RD.stickyYellow;
-            const rotation = isActive ? 0 : rotations[i % rotations.length];
-            const priorityRule =
-              n.priority === 'high'
-                ? `3px solid ${RD.ruby}`
-                : n.priority === 'medium'
-                ? `3px solid ${RD.gold}`
-                : '3px solid transparent';
-
-            return (
-              <div
-                key={n.id}
-                onClick={() => setActiveNote(n.id)}
-                style={{
-                  position: 'relative',
-                  padding: '12px 14px 14px 20px',
-                  marginBottom: 14,
-                  background: stickyBg,
-                  boxShadow: isActive ? RD.shadowDeep : RD.shadowSticky,
-                  cursor: 'pointer',
-                  transform: `rotate(${rotation}deg)`,
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  borderRadius: '1px 1px 8px 1px',
-                  borderLeft: priorityRule,
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: -6,
-                    left: '50%',
-                    transform: 'translateX(-50%) rotate(-2deg)',
-                    width: 50,
-                    height: 14,
-                    background: 'rgba(255,255,255,0.5)',
-                    border: `0.5px solid rgba(180,160,120,0.3)`,
-                    boxShadow: '0 1px 2px rgba(60,40,20,0.06)',
-                  }}
-                />
-
-                <span
-                  onClick={(e) => handleDelete(n.id, e)}
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 8,
-                    fontSize: 14,
-                    color: RD.inkFade,
-                    cursor: 'pointer',
-                    padding: '0 4px',
-                    borderRadius: 2,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = RD.ruby; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = RD.inkFade; }}
-                >
-                  ×
-                </span>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                    marginBottom: 6,
-                  }}
-                >
-                  {n.origin !== 'self' && (
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: '50%',
-                        background: origin.color,
-                        color: '#fff',
-                        fontFamily: RD.display,
-                        fontSize: 13,
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        boxShadow:
-                          'inset 0 -1px 0 rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
-                        transform: 'rotate(-3deg)',
-                      }}
-                    >
-                      {origin.initial}
-                    </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: RD.display,
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: RD.ink,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {n.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: RD.inkSoft,
-                        marginTop: 2,
-                        letterSpacing: 0.5,
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      — {origin.label}
-                      {isMulti
-                        ? `, affecting ${n.scenes!.length} scenes`
-                        : n.scenes.length > 0
-                        ? `, on a scene`
-                        : ''}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    fontFamily: RD.sans,
-                    fontSize: 12,
-                    color: RD.ink,
-                    lineHeight: 1.55,
-                    marginTop: 4,
-                    display: '-webkit-box',
-                    WebkitLineClamp: isActive ? 'unset' : 2,
-                    WebkitBoxOrient:
-                      'vertical' as CSSProperties['WebkitBoxOrient'],
-                    overflow: 'hidden',
-                  }}
-                >
-                  {n.body}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 10,
-                    paddingTop: 8,
-                    borderTop: `1px dashed rgba(0,0,0,0.12)`,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <StatusStamp status={n.status} />
-                </div>
-              </div>
-            );
-          })}
+        {view === 'scene' && density === 'sticky' && (
+          <TriageView
+            notes={notes}
+            activeNote={activeNote}
+            activeScene={activeScene}
+            setActiveNote={setActiveNote}
+            onDelete={handleDelete}
+            drawerExpanded={drawerExpanded}
+            setDrawerExpanded={setDrawerExpanded}
+            activeStatusFilter={activeStatusFilter}
+            setActiveStatusFilter={setActiveStatusFilter}
+          />
+        )}
 
         {/* List density */}
         {view === 'scene' &&
