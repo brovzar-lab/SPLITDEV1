@@ -193,6 +193,14 @@ export default function Editor() {
 
   const graduatedReplies = agentReplies.filter(r => r.status === 'graduated');
 
+  // T3.4 — paint demo revision states onto a handful of lines so the diff
+  // overlay has something to render against the live data. Hooks must run
+  // before the early returns below, so memo on the possibly-undefined data.
+  const scenes = useMemo(
+    () => (data ? applyDemoRevisions(data.scenes) : []),
+    [data],
+  );
+
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
     { getKey: ({ id }) => `line:${id}` },
@@ -310,9 +318,6 @@ export default function Editor() {
   }
 
   const { screenplay, notes, characterBible, beats } = data;
-  // T3.4 — paint demo revision states onto a handful of lines so the diff
-  // overlay has something to render against the live data.
-  const scenes = useMemo(() => applyDemoRevisions(data.scenes), [data.scenes]);
 
   // Set default active scene to first scene on first load
   const effectiveActiveScene =
