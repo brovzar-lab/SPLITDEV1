@@ -526,6 +526,7 @@ export default function Editor() {
               activeSceneLabel={
                 scenes.find(s => s.id === effectiveActiveScene)?.position?.toString()
               }
+              scenes={scenes}
             />
           </div>
           <Divider
