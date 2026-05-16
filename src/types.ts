@@ -41,6 +41,7 @@ export interface Agent {
   name: string;
   color: string;
   desc: string;
+  glyph: string;
 }
 
 export interface NoteOrigin {
