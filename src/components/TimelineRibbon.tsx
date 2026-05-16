@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RD } from '../tokens';
 import type { Scene, Line, Note, Beat } from '../api/types';
 import { ACT_BOUNDS } from '../data/beats';
-import { resolveBeats } from '../lib/inferBeats';
+import { resolveBeats, type InferredBeat } from '../lib/inferBeats';
 
 interface Props {
   scenes: Array<Scene & { lines: Line[] }>;
@@ -19,8 +19,71 @@ const ACT_FILL = {
   III: `${RD.forest}30`,
 };
 
-// Density-aware: hide minor beats when more than this many scenes are visible.
-const MINOR_HIDE_THRESHOLD = 60;
+// 12px keep-clear from the rail edges so first/last beat labels don't
+// bleed off-screen.
+const EDGE_PAD_PX = 12;
+// Cheap-but-stable per-character width estimate at the ribbon's font sizes
+// (Cormorant italic uppercase + letter-spacing 1.2). Empirical; doesn't
+// need to be pixel-perfect, just close enough to predict collisions.
+const CHAR_PX_MAJOR = 6.2;  // 9.5px font
+const CHAR_PX_MINOR = 5.4;  // 8.5px font
+// Minimum visual gap between two adjacent beat label boxes.
+const MIN_LABEL_GAP_PX = 8;
+
+interface PlacedBeat {
+  beat: InferredBeat;
+  leftPct: number;
+  widthPx: number;
+}
+
+// Run collision math: drop minor beats first, then minimal-priority majors
+// (closest to higher-priority neighbors), until every visible label fits
+// at the ribbon's current pixel width.
+function selectVisibleBeats(beats: InferredBeat[], ribbonPx: number): InferredBeat[] {
+  if (ribbonPx < 80 || beats.length === 0) return beats;
+  const place = (b: InferredBeat): PlacedBeat => {
+    const ch = b.kind === 'major' ? CHAR_PX_MAJOR : CHAR_PX_MINOR;
+    return { beat: b, leftPct: b.pct, widthPx: b.name.length * ch };
+  };
+  const sorted = [...beats].sort((a, b) => a.pct - b.pct);
+  const visible = sorted.map(place);
+
+  const overlaps = (placed: PlacedBeat[]): number => {
+    for (let i = 0; i < placed.length - 1; i++) {
+      const a = placed[i];
+      const b = placed[i + 1];
+      const aCenter = a.leftPct * ribbonPx;
+      const bCenter = b.leftPct * ribbonPx;
+      const gap = bCenter - aCenter - (a.widthPx + b.widthPx) / 2;
+      if (gap < MIN_LABEL_GAP_PX) return i;
+    }
+    return -1;
+  };
+
+  // Pass 1: drop minors that overlap a neighbor
+  let current = visible.slice();
+  let collision = overlaps(current);
+  while (collision !== -1) {
+    const a = current[collision];
+    const b = current[collision + 1];
+    // Drop whichever is minor; if both minor, drop the closer-to-edge one
+    // (further from center 0.5); if both major, drop the second one to keep
+    // the earlier-anchor anchor visible.
+    let dropIdx: number;
+    if (a.beat.kind === 'minor' && b.beat.kind === 'major') dropIdx = collision;
+    else if (a.beat.kind === 'major' && b.beat.kind === 'minor') dropIdx = collision + 1;
+    else if (a.beat.kind === 'minor' && b.beat.kind === 'minor') {
+      const aDist = Math.abs(a.leftPct - 0.5);
+      const bDist = Math.abs(b.leftPct - 0.5);
+      dropIdx = aDist > bDist ? collision : collision + 1;
+    } else {
+      dropIdx = collision + 1;
+    }
+    current.splice(dropIdx, 1);
+    collision = overlaps(current);
+  }
+  return current.map(p => p.beat);
+}
 
 export function TimelineRibbon({
   scenes,
@@ -32,7 +95,26 @@ export function TimelineRibbon({
 }: Props) {
   const N = scenes.length;
   const inferred = useMemo(() => resolveBeats(beats, scenes), [beats, scenes]);
-  const hideMinor = N > MINOR_HIDE_THRESHOLD;
+
+  // Track ribbon width in px so we can collide-test label boxes against
+  // the actual rendered space, not against the scene-count proxy.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [ribbonPx, setRibbonPx] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setRibbonPx(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const visibleBeats = useMemo(
+    () => selectVisibleBeats(inferred, ribbonPx),
+    [inferred, ribbonPx],
+  );
 
   // Per-scene note counts for the density layer.
   const noteCounts = useMemo(() => {
@@ -54,6 +136,7 @@ export function TimelineRibbon({
 
   return (
     <div
+      ref={containerRef}
       className="rd-timeline-ribbon"
       style={{
         height: 76,
@@ -69,27 +152,40 @@ export function TimelineRibbon({
     >
       {/* Row 1 — beat names (28px) */}
       <div style={{ height: 28, position: 'relative' }}>
-        {inferred
-          .filter(b => !hideMinor || b.kind === 'major')
-          .map(b => {
-            const leftPct = b.pct * 100;
-            const isMajor = b.kind === 'major';
-            return (
-              <div
-                key={b.id}
-                style={{
-                  position: 'absolute',
-                  left: `${leftPct}%`,
-                  top: 4,
-                  transform: 'translateX(-50%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 2,
-                  pointerEvents: 'none',
-                }}
-                title={b.name}
-              >
+        {visibleBeats.map(b => {
+          const leftPct = b.pct * 100;
+          const isMajor = b.kind === 'major';
+          // Edge-aware: when the label center sits within EDGE_PAD_PX of
+          // the rail edge, switch the transform-origin so the label stays
+          // inside instead of bleeding off-screen.
+          const centerPx = b.pct * ribbonPx;
+          const charPx = isMajor ? CHAR_PX_MAJOR : CHAR_PX_MINOR;
+          const halfWidth = (b.name.length * charPx) / 2;
+          let transform = 'translateX(-50%)';
+          let leftValue: string = `${leftPct}%`;
+          if (centerPx - halfWidth < EDGE_PAD_PX) {
+            transform = 'translateX(0)';
+            leftValue = `${EDGE_PAD_PX}px`;
+          } else if (centerPx + halfWidth > ribbonPx - EDGE_PAD_PX) {
+            transform = 'translateX(-100%)';
+            leftValue = `${ribbonPx - EDGE_PAD_PX}px`;
+          }
+          return (
+            <div
+              key={b.id}
+              style={{
+                position: 'absolute',
+                left: leftValue,
+                top: 4,
+                transform,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                pointerEvents: 'none',
+              }}
+              title={b.name}
+            >
                 <div
                   style={{
                     fontFamily: RD.display,
