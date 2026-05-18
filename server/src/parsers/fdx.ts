@@ -21,6 +21,14 @@ function textOf(t: FdxParagraph['Text']): string {
   return '';
 }
 
+// Collapse whitespace runs (including newlines from multi-line FDX <Text>
+// or wrapped paragraphs) to a single space, then trim. Without this, hard
+// line breaks in the source vanish during HTML render and adjacent words
+// collide ("que hablar de" → "quehablarde").
+function normalizeWhitespace(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
 export function parseFdx(source: string): ParsedScreenplay {
   const doc = xml.parse(source);
   const paragraphs: FdxParagraph[] = doc?.FinalDraft?.Content?.Paragraph ?? [];
@@ -37,7 +45,7 @@ export function parseFdx(source: string): ParsedScreenplay {
 
   for (const p of paragraphs) {
     const type = p['@_Type'];
-    const text = textOf(p.Text).trim();
+    const text = normalizeWhitespace(textOf(p.Text));
     if (!text) continue;
     switch (type) {
       case 'Scene Heading':

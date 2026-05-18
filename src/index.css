@@ -37,3 +37,18 @@ button { font-family: inherit; }
 
 .rd-no-scrollbar { scrollbar-width: none; }
 .rd-no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media print {
+  .rd-timeline-ribbon { display: none !important; }
+  .rd-reading-print-hide { display: none !important; }
+  .rd-reading-scroll { overflow: visible !important; height: auto !important; }
+  .rd-reading-paper {
+    box-shadow: none !important;
+    width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .rd-reading-scene { page-break-before: always; }
+  .rd-reading-scene:first-child { page-break-before: avoid; }
+}

@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RD } from '../tokens';
 import { TopBar } from '../components/TopBar';
 import { Sidebar } from '../components/Sidebar';
+import { TimelineRibbon } from '../components/TimelineRibbon';
+import { OutlineDrawer } from '../components/OutlineDrawer';
+import { PresenceGrid } from '../components/PresenceGrid';
+import { ReadingMode } from '../components/ReadingMode';
 import { Screenplay } from '../components/Screenplay';
 import { Notes } from '../components/Notes';
 import { Chat } from '../components/Chat';
@@ -17,6 +21,7 @@ import { api } from '../api/client';
 import type { Line, Note, Scene } from '../api/types';
 import type { AgentReply, ChatTarget, LineMenuContext } from '../types';
 import { REVISION_COLORS } from '../data/revisions';
+import { applyDemoRevisions } from '../data/demoRevisions';
 import { Toast, type ToastTone } from '../components/Toast';
 import { FindSimilarDrawer } from '../components/FindSimilarDrawer';
 
@@ -42,9 +47,27 @@ export default function Editor() {
   const [middleW, setMiddleW] = useState(380);
   const [notesSplit, setNotesSplit] = useState(0.48);
   const [revisionColor, setRevisionColor] = useState('blue');
+  const [compareToBase, setCompareToBase] = useState(false);
+  const baseRevisionId = 'white';
   const [viewMode, setViewMode] = useState<'script' | 'cards'>('script');
   const [characterFilter, setCharacterFilter] = useState<string | null>(null);
   const [bibleOpen, setBibleOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('splitdev.outline.open') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [presenceOpen, setPresenceOpen] = useState(false);
+  const [readingOpen, setReadingOpen] = useState(false);
+  const [readingLastScene, setReadingLastScene] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('splitdev.read.lastScene');
+    } catch {
+      return null;
+    }
+  });
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null);
   const [revisionTaggedLineIds, setRevisionTaggedLineIds] = useState<Set<string>>(
     () => new Set(),
@@ -72,6 +95,43 @@ export default function Editor() {
   useEffect(() => () => {
     graduateTimers.current.forEach(t => clearTimeout(t));
     graduateTimers.current.clear();
+  }, []);
+
+  // T3.1 — ⌘O / Ctrl+O toggles the outline drawer; persist across reloads.
+  // T3.2 — `i` opens the Presence Grid inspector (single-key, no modifier).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const inField = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+
+      const isCmdO = (e.metaKey || e.ctrlKey) && (e.key === 'o' || e.key === 'O');
+      if (isCmdO) {
+        if (inField) return;
+        e.preventDefault();
+        setOutlineOpen(prev => {
+          const next = !prev;
+          try { localStorage.setItem('splitdev.outline.open', next ? '1' : '0'); } catch {}
+          return next;
+        });
+        return;
+      }
+
+      if ((e.key === 'i' || e.key === 'I') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (inField) return;
+        e.preventDefault();
+        setPresenceOpen(prev => !prev);
+        return;
+      }
+
+      // T3.3 — ⌘\ / Ctrl+\ toggles full-bleed reading mode.
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        setReadingOpen(prev => !prev);
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const handleAgentReplyDone = (input: {
@@ -132,6 +192,14 @@ export default function Editor() {
   };
 
   const graduatedReplies = agentReplies.filter(r => r.status === 'graduated');
+
+  // T3.4 — paint demo revision states onto a handful of lines so the diff
+  // overlay has something to render against the live data. Hooks must run
+  // before the early returns below, so memo on the possibly-undefined data.
+  const scenes = useMemo(
+    () => (data ? applyDemoRevisions(data.scenes) : []),
+    [data],
+  );
 
   const lineSave = useAutosave<{ id: string; patch: Partial<Line> }>(
     ({ id, patch }) => api.patchLine(id, patch),
@@ -249,7 +317,7 @@ export default function Editor() {
     );
   }
 
-  const { screenplay, scenes, notes, characterBible, beats } = data;
+  const { screenplay, notes, characterBible, beats } = data;
 
   // Set default active scene to first scene on first load
   const effectiveActiveScene =
@@ -443,6 +511,9 @@ export default function Editor() {
         screenplayId={data.screenplay.id}
         revisionColor={revisionColor}
         setRevisionColor={setRevisionColor}
+        compareToBase={compareToBase}
+        setCompareToBase={setCompareToBase}
+        baseRevisionId={baseRevisionId}
         viewMode={viewMode}
         setViewMode={setViewMode}
         characterFilter={characterFilter}
@@ -456,15 +527,35 @@ export default function Editor() {
         saveStatus={saveStatus}
       />
 
+      <TimelineRibbon
+        scenes={scenes}
+        beats={beats}
+        notes={notes}
+        activeScene={effectiveActiveScene}
+        setActiveScene={setActiveScene}
+        currentPage={currentPage}
+      />
+
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <div style={{ width: sidebarW, flexShrink: 0, overflow: 'hidden' }}>
-          <Sidebar
-            activeScene={effectiveActiveScene}
-            setActiveScene={setActiveScene}
-            scenes={scenes}
-            beats={beats}
-            notes={notes}
-          />
+          {outlineOpen ? (
+            <OutlineDrawer
+              scenes={scenes}
+              beats={beats}
+              notes={notes}
+              activeScene={effectiveActiveScene}
+              setActiveScene={setActiveScene}
+            />
+          ) : (
+            <Sidebar
+              activeScene={effectiveActiveScene}
+              setActiveScene={setActiveScene}
+              scenes={scenes}
+              beats={beats}
+              notes={notes}
+              characters={characterBible}
+            />
+          )}
         </div>
         <Divider
           direction="vertical"
@@ -491,6 +582,7 @@ export default function Editor() {
             highlightLineId={highlightLineId}
             graduatedReplies={graduatedReplies}
             onBackToChat={handleAgentReplyBackToChat}
+            compareToBase={compareToBase}
           />
         </div>
         <Divider
@@ -582,6 +674,28 @@ export default function Editor() {
         open={bibleOpen}
         onClose={() => setBibleOpen(false)}
         characters={characterBible}
+      />
+      <PresenceGrid
+        open={presenceOpen}
+        onClose={() => setPresenceOpen(false)}
+        scenes={scenes}
+        characters={characterBible}
+        notes={notes}
+        activeScene={effectiveActiveScene}
+        setActiveScene={setActiveScene}
+      />
+      <ReadingMode
+        open={readingOpen}
+        scenes={scenes}
+        initialSceneId={readingLastScene ?? effectiveActiveScene}
+        onClose={lastSceneId => {
+          setReadingOpen(false);
+          if (lastSceneId) {
+            setReadingLastScene(lastSceneId);
+            setActiveScene(lastSceneId);
+            try { localStorage.setItem('splitdev.read.lastScene', lastSceneId); } catch {}
+          }
+        }}
       />
       {toast && (
         <Toast

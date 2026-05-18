@@ -22,6 +22,32 @@ describe('parseFountain', () => {
     });
   });
 
+  it('collapses interior whitespace in multi-line dialogue and action', () => {
+    // Regression — fountain-js preserves \n in multi-line dialogue; without
+    // normalization the newline survived to HTML and adjacent words collided
+    // ("que hablar de" → "quehablarde"). See AUDIT_2026-05-16 §2.1.
+    const src = `INT. ROOM - DAY
+
+A long action line that wraps
+across two source lines.
+
+KARLA
+Tenemos que hablar
+de Grupo Serrano.
+`;
+    const ps = parseFountain(src);
+    const scene = ps.scenes[0];
+    expect(scene.lines[0]).toEqual({
+      type: 'action',
+      text: 'A long action line that wraps across two source lines.',
+    });
+    expect(scene.lines[1]).toMatchObject({
+      type: 'dialogue',
+      character: 'KARLA',
+      text: 'Tenemos que hablar de Grupo Serrano.',
+    });
+  });
+
   it('parses The Cabin fixture into 4 scenes with dialogue + action', () => {
     const src = readFileSync(join(fixtureDir, 'the-cabin.fountain'), 'utf8');
     const ps = parseFountain(src);

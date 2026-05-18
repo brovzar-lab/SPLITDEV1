@@ -30,6 +30,32 @@ type View = 'scene' | 'pattern';
 // Sticky-origin palette, board rotations, and StatusStamp moved to
 // Notes/TriageView.tsx (T2.3). List/Sheet branches use inline styles.
 
+// Audit §1.5 — single source of truth for the notes-column toolbar.
+// Rendered identically in both the empty-state header and the populated
+// header. Same JSX, same styling, just lifted from two inline copies.
+function NotesToolbar({ onIngest }: { onIngest: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button
+        onClick={onIngest}
+        style={{
+          padding: '4px 10px',
+          fontSize: 10,
+          fontFamily: RD.display,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          background: 'transparent',
+          color: RD.copper,
+          border: `1px solid ${RD.copper}50`,
+          borderRadius: 2,
+          cursor: 'pointer',
+        }}
+      >📋 Ingest notes</button>
+    </div>
+  );
+}
+
 export function Notes({
   notes,
   patternNotes,
@@ -54,6 +80,20 @@ export function Notes({
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [creating, setCreating] = useState(false);
   const [ingestOpen, setIngestOpen] = useState(false);
+
+  // Audit §1.5 — single JSX definition for the IngestModal so both view
+  // branches mount the same element (still one runtime mount per render,
+  // but no source duplication).
+  const ingestModalJsx = ingestOpen ? (
+    <IngestModal
+      screenplayId={screenplayId}
+      onClose={() => setIngestOpen(false)}
+      onIngested={(notes) => {
+        notes.forEach(n => onNoteCreated(n));
+        setIngestOpen(false);
+      }}
+    />
+  ) : null;
 
   // T2.3 — Triage view state. Drawer is collapsed by default; Distribution
   // Strip toggles a single-status filter that applies to the pile (and to
@@ -135,44 +175,7 @@ export function Notes({
           >
             Notes
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => setIngestOpen(true)}
-              style={{
-                padding: '4px 10px',
-                fontSize: 10,
-                fontFamily: RD.display,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                background: 'transparent',
-                color: RD.copper,
-                border: `1px solid ${RD.copper}50`,
-                borderRadius: 2,
-                cursor: 'pointer',
-              }}
-            >📋 Ingest notes</button>
-            <button
-              onClick={() => setNewOpen(o => !o)}
-              style={{
-                padding: '6px 12px 7px',
-                background: RD.copper,
-                color: RD.paper,
-                fontFamily: RD.sans,
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                boxShadow:
-                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
-              }}
-            >
-              ＋ New note
-            </button>
-          </div>
+          <NotesToolbar onIngest={() => setIngestOpen(true)} />
         </div>
 
         {triageStatus && triageStatus !== 'done' && (
@@ -313,16 +316,7 @@ export function Notes({
           <div style={{ fontSize: 11 }}>No notes yet for this screenplay</div>
         </div>
 
-        {ingestOpen && (
-          <IngestModal
-            screenplayId={screenplayId}
-            onClose={() => setIngestOpen(false)}
-            onIngested={(notes) => {
-              notes.forEach(n => onNoteCreated(n));
-              setIngestOpen(false);
-            }}
-          />
-        )}
+        {ingestModalJsx}
       </div>
     );
   }
@@ -405,42 +399,7 @@ export function Notes({
                 Scene filtered ✕
               </span>
             )}
-            <button
-              onClick={() => setIngestOpen(true)}
-              style={{
-                padding: '4px 10px',
-                fontSize: 10,
-                fontFamily: RD.display,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                background: 'transparent',
-                color: RD.copper,
-                border: `1px solid ${RD.copper}50`,
-                borderRadius: 2,
-                cursor: 'pointer',
-              }}
-            >📋 Ingest notes</button>
-            <button
-              onClick={() => setNewOpen(o => !o)}
-              style={{
-                padding: '6px 12px 7px',
-                background: RD.copper,
-                color: RD.paper,
-                fontFamily: RD.sans,
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                boxShadow:
-                  '0 2px 0 #8c2828, 0 3px 4px rgba(60,40,20,0.18)',
-              }}
-            >
-              ＋ New note
-            </button>
+            <NotesToolbar onIngest={() => setIngestOpen(true)} />
           </div>
         </div>
 
@@ -945,16 +904,7 @@ export function Notes({
         )}
       </div>
 
-      {ingestOpen && (
-        <IngestModal
-          screenplayId={screenplayId}
-          onClose={() => setIngestOpen(false)}
-          onIngested={(notes) => {
-            notes.forEach(n => onNoteCreated(n));
-            setIngestOpen(false);
-          }}
-        />
-      )}
+      {ingestModalJsx}
     </div>
   );
 }

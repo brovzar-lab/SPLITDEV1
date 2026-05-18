@@ -59,7 +59,7 @@ r.delete('/notes/:id', (req, res) => {
 
 r.post('/screenplays/:id/notes:ingest', upload.single('file'), async (req, res) => {
   const db = req.app.locals.db;
-  const screenplayId = req.params.id;
+  const screenplayId = req.params.id as string;
   let text: string;
   try {
     if (req.file) {

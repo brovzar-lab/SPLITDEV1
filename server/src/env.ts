@@ -1,4 +1,8 @@
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+// override: true so server/.env always wins over already-set env vars.
+// Without this, an inherited empty ANTHROPIC_API_KEY (e.g. from a parent
+// shell or IDE-injected env) silently blanks the key.
+loadDotenv({ override: true });
 
 function required(name: string, fallback?: string): string {
   const v = process.env[name] ?? fallback;
