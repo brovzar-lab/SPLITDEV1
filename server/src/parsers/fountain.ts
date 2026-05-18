@@ -3,8 +3,14 @@ import type { ParsedScreenplay, ParsedScene, ParsedLine } from './types.js';
 
 export function parseFountain(source: string): ParsedScreenplay {
   const f = new Fountain();
+  // §2.1 whitespace fix — fountain-js drops soft line-breaks within action/
+  // dialogue paragraphs WITHOUT inserting a space, so "que\nhablarde" →
+  // "quehablarde" instead of "que hablarde". Pre-normalise: replace any \n
+  // that is NOT immediately preceded or followed by another \n (i.e. a soft
+  // wrap, not a Fountain paragraph break) with a single space.
+  const normalizedSource = source.replace(/([^\n])\n([^\n])/g, '$1 $2');
   // Pass `true` to request the token array — required by fountain-js API
-  const out = f.parse(source, true);
+  const out = f.parse(normalizedSource, true);
 
   // `out.title` is already the clean string extracted from the title page
   const title = out.title?.trim() || 'Untitled';
