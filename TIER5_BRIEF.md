@@ -1,22 +1,22 @@
-# SPLITDEV — Tier 4 Brief (Audit Round 2)
+# SPLITDEV — Tier 5 Brief (Audit Round 2)
 
-**Single-session task brief for Claude Code.** Paste this whole file into a fresh Claude Code session pointed at `SPLITDEV1/`, on a fresh `tier4` branch off `main` (which now contains Tier 1 + Tier 2 + Tier 3). Execute in order. One PR per item.
+**Single-session task brief for Claude Code.** Paste this whole file into a fresh Claude Code session pointed at `SPLITDEV1/`, on a fresh `tier5` branch off `main` (which now contains Tier 1 + Tier 2 + Tier 3). Execute in order. One PR per item.
 
 ---
 
 ## Mission
 
-**Tier 4 is "Trust & Theatre."** Five items that close the build's biggest contract violations (Apply ▸ doesn't apply, Bible starts empty) and turn the franchise moments (ingest, session greeting) from streamed text into ceremonies. Mocked on `docs/tier4-mockups.html` (commit alongside this brief) and the human reviewer has locked specific variants below.
+**Tier 5 is "Trust & Theatre." (renamed from Tier 4 to avoid branch-namespace collision with the existing `audit/T4-*` bug-fix PRs from the May 16 audit.)** Five items that close the build's biggest contract violations (Apply ▸ doesn't apply, Bible starts empty) and turn the franchise moments (ingest, session greeting) from streamed text into ceremonies. Mocked on `docs/tier5-mockups.html` (commit alongside this brief) and the human reviewer has locked specific variants below.
 
 ## ✅ Mock review status — all five items APPROVED
 
 Approved by the human reviewer on **May 18 2026**. The variants below ARE the approved variants; do not deviate without asking.
 
-- **T4.1** — Variant B (Manuscript spread). Variants A and C archived.
-- **T4.2** — Storyboard ships as drawn (3-frame flow). Button style A (solid copper, current).
-- **T4.3** — Theatre storyboard ships as drawn. Rounds Variant A (Ledger). Variant B archived as future archive view.
-- **T4.4** — Variant A (Sticky note pinned to manuscript). Variants B and C archived.
-- **T4.5** — Polish pack ships as one PR; all six pairs.
+- **T5.1** — Variant B (Manuscript spread). Variants A and C archived.
+- **T5.2** — Storyboard ships as drawn (3-frame flow). Button style A (solid copper, current).
+- **T5.3** — Theatre storyboard ships as drawn. Rounds Variant A (Ledger). Variant B archived as future archive view.
+- **T5.4** — Variant A (Sticky note pinned to manuscript). Variants B and C archived.
+- **T5.5** — Polish pack ships as one PR; all six pairs.
 
 ## ⚠ Prerequisites
 
@@ -27,7 +27,7 @@ This brief assumes Tier 3 is merged into `main`. Specifically:
 - T3.3 (Reading mode)
 - T3.4 (Inline diff overlay)
 
-Branch off `main`, name it `tier4`. Merge each `audit/T4-*` branch into it.
+Branch off `main`, name it `tier4`. Merge each `audit/T5-*` branch into it.
 
 ## House rules
 
@@ -36,7 +36,7 @@ Branch off `main`, name it `tier4`. Merge each `audit/T4-*` branch into it.
 3. Inline styles via `RD` tokens (`src/tokens.ts`). No raw hex. If a new token is needed, add it to `RD` first; flagged below as 🎨.
 4. No new dependencies. No CSS framework. No state-management lib.
 5. After every item, `npm run build` must pass. Server tests (`npm test`) must remain green.
-6. **One PR per item**, branch + title format: `audit/T4-<num>-<short-slug>`.
+6. **One PR per item**, branch + title format: `audit/T5-<num>-<short-slug>`.
 7. If a change feels bigger than the spec suggests, **stop and ask**.
 8. Match the prototype's tactile choices — sticky notes, pushpins, ink stamps, paper texture. Lean editorial, never minimalism-SaaS.
 
@@ -44,13 +44,13 @@ Branch off `main`, name it `tier4`. Merge each `audit/T4-*` branch into it.
 
 # The five items
 
-## T4.1 — Bible auto-populate ✅ APPROVED (Variant B)
+## T5.1 — Bible auto-populate ✅ APPROVED (Variant B)
 
 **Problem.** The Character Bible drawer (`src/components/Bible.tsx`) opens onto an empty state. The AI just read the entire screenplay during triage. That's a contract violation — the same Opus pass should populate cast + voice rules + want/need + presence.
 
 **APPROVED DIRECTION (Variant B — Manuscript spread).** Triage emits a *populated* Character Bible alongside its notes. Rendered as a manuscript-paper card (screenplay paper-sheet background, Cormorant italic, Courier for type metadata). Voice rules surface as **pull-quotes** (italic Cormorant with a 2px left border in the character's color). Only the top three rules show; below them, an italic dim line: *"+ N more · Right-click a line → 'Voice exemplar →' to teach me more."*
 
-**Anatomy.** Per the mock `docs/tier4-mockups.html` → T4.1 → "B · Manuscript spread":
+**Anatomy.** Per the mock `docs/tier5-mockups.html` → T5.1 → "B · Manuscript spread":
 
 1. **Header band** (paddingBottom 14, borderBottom `2px double ${RD.line}`):
    - 56×56 **NameTag** (filled square in `character.color`, white Courier letter, transform `rotate(-3deg)`, top-tape strip 60×14 at `rgba(184,137,58,0.5)` rotated `1deg`).
@@ -76,7 +76,7 @@ Branch off `main`, name it `tier4`. Merge each `audit/T4-*` branch into it.
 
 Persist via `server/src/models/characterBible.ts` and surface through the existing screenplay payload endpoint (`GET /api/screenplays/:id`).
 
-**Where (T4.1)**
+**Where (T5.1)**
 
 - `server/src/triage/runner.ts` — extend `TriageResponse` schema with `cast`. Insert into `character_bible` table after notes are saved.
 - `server/src/anthropic/prompts/triage/` — extend the triage prompt to request the cast structure. Voice-rule examples grounded in the actual script.
@@ -86,7 +86,7 @@ Persist via `server/src/models/characterBible.ts` and surface through the existi
 - `src/api/types.ts` — mirror.
 - `src/components/Bible.tsx` — replace existing right-panel character card layout with the **Manuscript spread** anatomy above. Keep the drawer chrome (header, character picker rail) as-is.
 
-**Acceptance (T4.1)**
+**Acceptance (T5.1)**
 
 - Uploading any `.fountain` or `.fdx` results in a populated Character Bible visible without any user action.
 - Each character card shows: NameTag, role/age/scene-count, Want, Need, top 3 voice rules as pull-quotes, "+N more" footer, presence strip.
@@ -99,17 +99,17 @@ Persist via `server/src/models/characterBible.ts` and surface through the existi
 - No new dependencies.
 - Triage stays a single Opus call. Do not split into two.
 - Voice rules are author-editable in the drawer (existing Bible component already supports edit; preserve that affordance — newly-AI-rules are editable too, no second-class state).
-- Reference `docs/tier4-mockups.html` → T4.1 → "B · Manuscript spread" for exact spec.
+- Reference `docs/tier5-mockups.html` → T5.1 → "B · Manuscript spread" for exact spec.
 
 ---
 
-## T4.2 — Wire Apply ▸ ✅ APPROVED (Storyboard + Button A)
+## T5.2 — Wire Apply ▸ ✅ APPROVED (Storyboard + Button A)
 
 **Problem.** The `Apply ▸` button in `src/components/Chat.tsx` (around line 800+ in the agent reply block, `msg.showApply`) is rendered but does nothing. No handler. No state change. No revision-log entry. This is the single most damaging unkept promise in the build.
 
 **APPROVED DIRECTION.** Wire the full three-frame flow from the storyboard. The acceptance test is **Frame ③** — clicking Apply ▸ on a Dialogue agent suggestion must (a) replace the target line inline with revision-color tint, (b) move the old line to the right-side gutter as a `was:` pin, (c) emit a new entry in the History panel. All four surfaces (chat → script body → gutter → history) update in concert in one transaction.
 
-**Anatomy** (per `docs/tier4-mockups.html` → T4.2):
+**Anatomy** (per `docs/tier5-mockups.html` → T5.2):
 
 **Frame ① — The suggestion (chat panel).** As today, with two polish tweaks: deletion struck through in `RD.ruby` (not generic grey); insertion shown in `${RD.copperSoft}80` with a `2px solid ${RD.copper}` left border.
 
@@ -153,7 +153,7 @@ export interface RevisionEntry {
 
 If `revision_entry` table exists in DB (per README "Editor's Log (revision_entry) is wired in the DB"), this PR only needs the route + handler + UI wire-up. Otherwise add a migration.
 
-**Where (T4.2)**
+**Where (T5.2)**
 
 - `server/src/models/revision.ts` — verify or add `insertRevisionEntry`, `listRevisionEntries(screenplayId)`.
 - `server/src/routes/` — new file `revisions.ts`: `POST /api/screenplays/:id/revisions` (creates entry + updates line), `GET /api/screenplays/:id/revisions`.
@@ -166,7 +166,7 @@ If `revision_entry` table exists in DB (per README "Editor's Log (revision_entry
 - New: `src/components/GutterPin.tsx` — extract the gutter-pin component (existing `AgentMarginPin` is the close cousin; the `was:` pin is a sibling type — keep them in one file or split, your call but commit to one structure).
 - `src/components/History.tsx` — render `RevisionEntry[]` newest-first. The existing `UNDO_HISTORY` mock fixture in `src/data/characters.ts` is replaced by real DB-backed data.
 
-**Acceptance (T4.2)**
+**Acceptance (T5.2)**
 
 - Apply ▸ on any agent suggestion in the chat panel:
   - Updates the target line in the screenplay panel (revision-color tint, asterisk, etc).
@@ -182,11 +182,11 @@ If `revision_entry` table exists in DB (per README "Editor's Log (revision_entry
 - Apply ▸ is **only** wired for agent-target chat messages (`msg.showApply === true`). Character-target replies do not surface Apply.
 - The `revision_entry` log is per-screenplay, not per-note. It does **not** replace the existing `Note.status` field (`unread / discussing / applied`); a note can be marked `applied` independently of any specific revision.
 - Reading mode (T3.3) hides the gutter — `was:` pins must not appear in reading mode.
-- Reference `docs/tier4-mockups.html` → T4.2 → "Storyboard · all three frames" for exact spec.
+- Reference `docs/tier5-mockups.html` → T5.2 → "Storyboard · all three frames" for exact spec.
 
 ---
 
-## T4.3 — Ingest theatre + Note rounds ✅ APPROVED (Storyboard + Rounds A)
+## T5.3 — Ingest theatre + Note rounds ✅ APPROVED (Storyboard + Rounds A)
 
 **Problem.** Two issues:
 1. The Ingest Notes flow (`src/components/Notes/IngestModal.tsx`) parses producer email → notes silently. No animation. The franchise feature lands as a quiet UI update.
@@ -203,7 +203,7 @@ If `revision_entry` table exists in DB (per README "Editor's Log (revision_entry
 
 **Anatomy.**
 
-**Theatre** (`docs/tier4-mockups.html` → T4.3 → "Arrival · 4-frame storyboard"):
+**Theatre** (`docs/tier5-mockups.html` → T5.3 → "Arrival · 4-frame storyboard"):
 - Animation lives in the Editor surface, not the modal — modal closes first, then the script reveals with notes arriving.
 - Scene-heading pulse: 1.2s ease-out, then steady-state.
 - Note gutter halo: 1.5s ease-out fade.
@@ -211,7 +211,7 @@ If `revision_entry` table exists in DB (per README "Editor's Log (revision_entry
 - `Reading · N of ?` badge: position `top: 18 right: 4` in gutter zone, `RD.copper` background, `RD.paper` text, italic Cormorant 10px 700 letter-spacing 1.5 uppercase, `RD.shadowDeep`.
 - Scanline overlay during parsing: `position: absolute; left: <gutter-left>; right: 0; top: 0; bottom: 0; background: repeating-linear-gradient(90deg, transparent 0 6px, ${RD.copperSoft}40 6px 7px); pointer-events: none;` — fades on completion.
 
-**Rounds Ledger** (`docs/tier4-mockups.html` → T4.3 → "Rounds · A · Ledger"):
+**Rounds Ledger** (`docs/tier5-mockups.html` → T5.3 → "Rounds · A · Ledger"):
 - Lives at the top of the Notes panel, **above** the existing `Notes 8 / Patterns 0` tabs.
 - Header row (`padding: 12px 16px`, `background: RD.paperDeep`, `borderBottom: 1px solid ${RD.line}`):
   - Cormorant italic 20px 600 — "Notes" (this replaces the existing Notes header).
@@ -247,7 +247,7 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 
 **Round naming.** When ingest completes, default name = `{producerInitials} — {weekdayShort} {h:mm} {ampm}`. Producer initials inferred from email signature; fall back to file name; fall back to `"Round {N}"`. Author-editable in the round row (inline edit on click).
 
-**Where (T4.3)**
+**Where (T5.3)**
 
 - `server/src/db/migrations/` — new migration adding `round` table and `note.round_id` column.
 - `server/src/models/round.ts` — new model: `createRound`, `listRounds`, `closeRound`, `assignNotesToRound`.
@@ -259,7 +259,7 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 - `src/components/Notes.tsx` — mount `<RoundsLedger>` at the top above tabs. Remove the duplicate `Notes` header inside the existing card; the ledger header now owns the title.
 - `src/components/Notes/IngestModal.tsx` — on success, close modal first, then call into Editor to trigger theatre. Editor wires `<IngestTheatre>` over the screenplay panel.
 
-**Acceptance (T4.3)**
+**Acceptance (T5.3)**
 
 - Ingesting a producer email creates a `Round` with auto-generated name. Notes from that ingest have `roundId` set.
 - The Notes panel shows a Rounds Ledger at the top with one row per round (active one highlighted in `RD.copperSoft`).
@@ -278,17 +278,17 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 - No new animation library. Use CSS keyframes + `transition` declarations.
 - Animation respects `prefers-reduced-motion: reduce` → all halos/pulses become instant fades; no movement.
 - If a screenplay's existing notes were created before this PR, treat them as belonging to a synthetic "Pre-Tier-4" round so the ledger isn't empty on first open.
-- Reference `docs/tier4-mockups.html` → T4.3 → "Arrival · 4-frame storyboard" and "Rounds · A · Ledger" for exact spec.
+- Reference `docs/tier5-mockups.html` → T5.3 → "Arrival · 4-frame storyboard" and "Rounds · A · Ledger" for exact spec.
 
 ---
 
-## T4.4 — Session-greeting ceremony ✅ APPROVED (Variant A — Sticky note)
+## T5.4 — Session-greeting ceremony ✅ APPROVED (Variant A — Sticky note)
 
 **Problem.** When the editor opens, the AI greets the writer via a streamed chat message that finalizes into the chat history. This is the second-best moment in the product (after ingest) and it reads as a wall of text. It should be a **ceremony**.
 
 **APPROVED DIRECTION.** Render the greeting as a yellow sticky note pinned to the manuscript with a copper pushpin, slight rotation, italic Cormorant body, and **three CTA buttons stacked vertically**. The card is mounted in the Editor surface, not the Chat panel. Dismissed by clicking any CTA or an explicit close glyph.
 
-**Anatomy** (per `docs/tier4-mockups.html` → T4.4 → "A · Sticky note"):
+**Anatomy** (per `docs/tier5-mockups.html` → T5.4 → "A · Sticky note"):
 
 - Position: `position: absolute; top: 40; right: -20; width: 280; transform: rotate(2.4deg); zIndex: 5`. Pinned to the top-right of the script paper-sheet (visually overlapping the manuscript page).
 - Background: `RD.stickyYellow`. Box-shadow: `RD.shadowSticky`. Padding `14px 16px 16px`.
@@ -312,7 +312,7 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 
 `focuses[0]` → primary CTA. `focuses[1]` → secondary CTA. Tertiary is always "Show me everything" and is hardcoded client-side. Clicking a focus CTA dismisses the card AND navigates to that scene / opens that note's chat.
 
-**Where (T4.4)**
+**Where (T5.4)**
 
 - `server/src/anthropic/prompts/session-opener.md` — extend prompt to return structured payload (text + focuses).
 - `server/src/routes/screenplays.ts` — the existing `POST /api/screenplays/:id/session/open` SSE stream. Update event payload to include `focuses`.
@@ -322,7 +322,7 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 - `src/pages/Editor.tsx` — mount `<SessionGreeting>` over the screenplay panel when `greeting` is loaded. Dismiss on any CTA click. Click handlers route to scene/note as appropriate.
 - `src/components/Chat.tsx` — **remove** the existing greeting-as-chat-message rendering. The chat panel no longer surfaces the greeting; SessionGreeting owns it exclusively. (The greeting can still be added to chat history on dismiss for context, but it does not stream into the chat UI.)
 
-**Acceptance (T4.4)**
+**Acceptance (T5.4)**
 
 - On editor open with a fresh screenplay, the sticky-note ceremony appears over the top-right of the manuscript page within the time the greeting takes to stream.
 - The card shows italic Cormorant greeting text and 1–3 focus CTAs (always at least one + the tertiary "Show me everything").
@@ -336,15 +336,15 @@ The note-ingest pipeline creates a `Round` + assigns `roundId` to every note it 
 - The card lives in the Editor, not the Chat. It is mounted as a sibling of `<Screenplay>` with absolute positioning relative to the script paper-sheet wrapper.
 - It does not block interaction with the script — clicking outside the card does not dismiss it (only explicit close or a CTA).
 - Reading mode (T3.3) does not show the card. (Reading mode and "first open" are mutually exclusive states anyway, but if the user opens reading mode before dismissing, the card defers to reading mode and re-appears on exit.)
-- Reference `docs/tier4-mockups.html` → T4.4 → "A · Sticky note" for exact spec.
+- Reference `docs/tier5-mockups.html` → T5.4 → "A · Sticky note" for exact spec.
 
 ---
 
-## T4.5 — Quick-win polish pack ✅ APPROVED (all six pairs)
+## T5.5 — Quick-win polish pack ✅ APPROVED (all six pairs)
 
 **Problem.** Six small visual loose ends from the Round 2 audit. Each is too small to justify a brief on its own; together they tighten the brand a full notch. Ship as one PR.
 
-**APPROVED DIRECTION.** Six before/after swaps, atomic. Per `docs/tier4-mockups.html` → T4.5.
+**APPROVED DIRECTION.** Six before/after swaps, atomic. Per `docs/tier5-mockups.html` → T5.5.
 
 ### 1. Status pip → Status stamp
 
@@ -368,16 +368,16 @@ Replace the gradient circle in `src/components/Chat.tsx` (the 38×38 avatar at t
 - Tape strip 60% wide at top: `position: absolute; top: -4; left: 20%; right: 20%; height: 6; background: rgba(184,137,58,0.55); transform: rotate(1.5deg); box-shadow: 0 1px 1px rgba(60,40,20,0.1)`.
 - Box-shadow: `0 1px 2px rgba(60,40,20,0.18), inset 0 -2px 0 rgba(0,0,0,0.12)`.
 
-Extract `<NameTag name color size rotate />` into `src/components/NameTag.tsx`. Use it for the chat header AND in Bible drawer (T4.1).
+Extract `<NameTag name color size rotate />` into `src/components/NameTag.tsx`. Use it for the chat header AND in Bible drawer (T5.1).
 
 ### 3. Pinned messages — ★ → Pushpin
 
 Replace the `★ {count}` button in `src/components/Chat.tsx` header with a copper pushpin glyph + `Pinned · {count}`:
-- Pushpin: 11px radial-gradient circle (spec same as T4.4 pushpin, smaller).
+- Pushpin: 11px radial-gradient circle (spec same as T5.4 pushpin, smaller).
 - Label: sans 10px 700 letter-spacing 1.5 uppercase `RD.copper`.
 - Container: `padding: 5px 10px 5px 8px; background: RD.copperSoft; border: 1px solid ${RD.copper}; display: inline-flex; align-items: center; gap: 6`.
 
-Extract `<Pushpin size color />` into `src/components/Pushpin.tsx`. Re-used in T4.4.
+Extract `<Pushpin size color />` into `src/components/Pushpin.tsx`. Re-used in T5.4.
 
 ### 4. Patterns — buried tab → topbar pill
 
@@ -407,7 +407,7 @@ In `src/components/Screenplay.tsx` (the `LineContextMenu` component, line ~440+)
 - Remove `borderRadius: 2`. The menu is paper, not a chip.
 - Eyebrow section labels: italic Cormorant 9.5px 700 letter-spacing 2 uppercase `RD.inkFade`.
 
-**Where (T4.5)** — combined:
+**Where (T5.5)** — combined:
 
 - New: `src/components/StatusStamp.tsx`, `src/components/NameTag.tsx`, `src/components/Pushpin.tsx`.
 - `src/components/Notes/TriageView.tsx` — use `<StatusStamp>`.
@@ -418,7 +418,7 @@ In `src/components/Screenplay.tsx` (the `LineContextMenu` component, line ~440+)
 - `src/pages/Editor.tsx` — J/K keystroke handler.
 - `src/components/Screenplay.tsx` — soften `LineContextMenu` shadow + paper background.
 
-**Acceptance (T4.5)**
+**Acceptance (T5.5)**
 
 - All six swaps visible in the running app.
 - Status stamps differentiated by glyph + color in both Triage view and list view.
@@ -433,14 +433,14 @@ In `src/components/Screenplay.tsx` (the `LineContextMenu` component, line ~440+)
 
 - No new dependencies.
 - Existing test coverage must remain green. Add no new tests; this is a visual PR.
-- Reference `docs/tier4-mockups.html` → T4.5 for each pair's before/after.
+- Reference `docs/tier5-mockups.html` → T5.5 for each pair's before/after.
 
 ---
 
 # Closing checklist (Claude Code)
 
 After each PR:
-- [ ] Branch named `audit/T4-<num>-<short-slug>`
+- [ ] Branch named `audit/T5-<num>-<short-slug>`
 - [ ] `npm run build` passes (strict TS green)
 - [ ] `npm test` (server vitest) passes
 - [ ] No new dependencies in `package.json`
@@ -449,15 +449,15 @@ After each PR:
 - [ ] Ambiguities called out in the PR body for reviewer attention
 
 **Order dependency.**
-- **T4.1 (Bible auto-populate)** — first. Pure data + new card. No deps on other Tier 4 items.
-- **T4.5 (Polish pack)** — second. Independent. Extracts `NameTag` / `Pushpin` which T4.4 reuses.
-- **T4.4 (Greeting ceremony)** — third. Depends on `Pushpin` from T4.5.
-- **T4.2 (Apply ▸ wired)** — fourth. The deepest wiring of Tier 4; biggest PR. Independent of others.
-- **T4.3 (Ingest theatre + Rounds)** — fifth. Depends on the `GutterPin` extracted in T4.2 (the `was:` pin and the round note-pin share the gutter primitive).
+- **T5.1 (Bible auto-populate)** — first. Pure data + new card. No deps on other Tier 5 items.
+- **T5.5 (Polish pack)** — second. Independent. Extracts `NameTag` / `Pushpin` which T5.4 reuses.
+- **T5.4 (Greeting ceremony)** — third. Depends on `Pushpin` from T5.5.
+- **T5.2 (Apply ▸ wired)** — fourth. The deepest wiring of Tier 4; biggest PR. Independent of others.
+- **T5.3 (Ingest theatre + Rounds)** — fifth. Depends on the `GutterPin` extracted in T5.2 (the `was:` pin and the round note-pin share the gutter primitive).
 
-After all five merge into `tier4`:
-1. Verify `docs/tier4-mockups.html` is committed.
-2. Open PR: `tier4 → main`.
+After all five merge into `tier5`:
+1. Verify `docs/tier5-mockups.html` is committed.
+2. Open PR: `tier5 → main`.
 3. Use the app for a few days before pulling backlog items (B-1 Teleprompter, B-2 Split-pane diff, B-3 Whisper mode, B-4 Bilingual gloss).
 
 If anything in this brief is ambiguous or contradicts CLAUDE.md, **stop and ask** before writing code. Do not improvise.
